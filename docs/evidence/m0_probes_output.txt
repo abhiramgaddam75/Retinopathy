@@ -1,0 +1,41 @@
+
+=== P2 training-loader reproducibility (same config, same seed, two fresh loaders) ===
+same image ids in first batch: True
+same image tensors in first batch: False
+
+=== P3 processed images after a preprocessing-config change, without --force ===
+exit code: 0 | processed file unchanged after clip_limit 2.0 -> 8.0: True
+with --force the file changes: True
+
+=== P4 manifest split column edited after locking ===
+training loader built without error; locked-test images now in training: 15
+lock file is under an ignored path (cannot be committed): /data/ vs default splits dir 'data/splits'
+
+=== P1 augmentation reproducibility under set_seed(42) ===
+two seeded runs give identical augmented tensors: False
+
+=== P5 byte-identical images under different ids (reported for APTOS 2019) ===
+planted duplicate pairs: 60; pairs whose two copies are in different splits: 32; warnings or errors raised: none
+
+=== P6 error handling ===
+corrupt image -> uncaught PreprocessError: cannot read image: C:/Users/abhir/AppData/Local/Temp/tmp4c33z5f4/raw/aptos2019/train_images/img003.png
+manifest written after failure: False
+class with 2 images -> uncaught ValueError: The least populated classes in y have only 1 member, which is too few. The minimum number of groups for any cl
+
+=== P7 field-of-view crop aspect ratio on the supplied sample photos ===
+sample_1.jpg   source 2000x1333  crop 1267x1261  width/height 1.005  vertical stretch at 512x512: +0.5%
+sample_10.jpg  source 2000x1333  crop 1271x1267  width/height 1.003  vertical stretch at 512x512: +0.3%
+sample_11.jpg  source 2000x1333  crop 1271x1268  width/height 1.002  vertical stretch at 512x512: +0.2%
+sample_3.jpg   source 2000x1333  crop 1266x1261  width/height 1.004  vertical stretch at 512x512: +0.4%
+sample_4.jpg   source 2000x1500  crop 1566x1500  width/height 1.044  vertical stretch at 512x512: +4.4%
+sample_5.jpg   source 2000x1500  crop 1565x1500  width/height 1.043  vertical stretch at 512x512: +4.3%
+sample_6.jpg   source 2000x1325  crop 1295x1295  width/height 1.000  vertical stretch at 512x512: +0.0%
+sample_7.jpg   source 2000x1325  crop 1295x1295  width/height 1.000  vertical stretch at 512x512: +0.0%
+sample_8.jpg   source 2000x1333  crop 1699x1333  width/height 1.275  vertical stretch at 512x512: +27.5%
+sample_9.jpg   source 2000x1333  crop 1686x1333  width/height 1.265  vertical stretch at 512x512: +26.5%
+
+=== P8 mutation checks (does the suite notice a planted fault?) ===
+M1 masks shifted 3 px after resize: DETECTED (test failed)
+M2 evaluation loaders given the training augmentation: DETECTED (test failed)
+M3 split made without stratification: DETECTED (test failed)
+M4 oversampling silently disabled in the training loader: NOT DETECTED (test passed)
