@@ -2,9 +2,10 @@
 from __future__ import annotations
 
 import dataclasses
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Mapping, Sequence, get_args, get_origin, get_type_hints
+from typing import Any, get_args, get_origin, get_type_hints
 
 import yaml
 
@@ -174,7 +175,7 @@ def _coerce(value: Any, hint: Any, key: str) -> Any:
             return tuple(_coerce(v, args[0], f"{key}[{i}]") for i, v in enumerate(value))
         if len(args) != len(value):
             raise ConfigError(f"'{key}' must have {len(args)} items, got {len(value)}")
-        return tuple(_coerce(v, a, f"{key}[{i}]") for i, (v, a) in enumerate(zip(value, args)))
+        return tuple(_coerce(v, a, f"{key}[{i}]") for i, (v, a) in enumerate(zip(value, args, strict=True)))
     if hint is dict:
         if not isinstance(value, Mapping):
             raise ConfigError(f"'{key}' must be a mapping, got {value!r}")
@@ -198,7 +199,7 @@ def _coerce(value: Any, hint: Any, key: str) -> Any:
     return value
 
 
-def _build(cls: type, raw: Mapping[str, Any], prefix: str = "") -> Any:
+def _build(cls: Any, raw: Mapping[str, Any], prefix: str = "") -> Any:
     hints = get_type_hints(cls)
     fields = {f.name: f for f in dataclasses.fields(cls)}
     unknown = sorted(set(raw) - set(fields))

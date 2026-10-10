@@ -1,7 +1,8 @@
 """Torch datasets and loaders over the canonical manifest."""
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
+from typing import Any
 
 import cv2
 import numpy as np
@@ -21,7 +22,7 @@ def _load_rgb(path: str) -> np.ndarray:
     return cv2.cvtColor(read_image(path), cv2.COLOR_BGR2RGB)
 
 
-def _label(value: object) -> int:
+def _label(value: Any) -> int:
     return MISSING_LABEL if pd.isna(value) else int(value)
 
 
@@ -67,7 +68,8 @@ class LesionDataset(Dataset):
         row = self.df.iloc[index].to_dict()
         _, masks = preprocess_record(row, self.size)
         image = self.transform(image=_load_rgb(row["processed_path"]))["image"]
-        return image, {k: torch.from_numpy(v) for k, v in masks.items()}, _label(row["grade"]), row["image_id"]
+        mask_tensors = {k: torch.from_numpy(v) for k, v in masks.items()}
+        return image, mask_tensors, _label(row["grade"]), row["image_id"]
 
 
 def make_train_loader(manifest_df: pd.DataFrame, cfg: Config) -> DataLoader:

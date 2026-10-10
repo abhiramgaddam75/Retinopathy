@@ -7,9 +7,10 @@ import logging
 import platform
 import sys
 import time
+from collections.abc import Mapping
 from importlib import metadata
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 import yaml
 

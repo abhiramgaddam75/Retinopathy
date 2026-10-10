@@ -23,5 +23,10 @@ pytest==9.1.1
 nbformat==5.11.1
 nbconvert==7.17.1
 ipykernel==7.4.0
+# Static checks run by the Tester (VERIFICATION_AND_RESEARCH_BRIEF.md, A1)
+mypy==2.4.0
+pandas-stubs==3.0.5.260914
+ruff==0.17.0
+types-pyyaml==6.0.12.20260906
 # Only needed to download APTOS 2019 with the Kaggle API (docs/DATA_ACCESS.md); not installed here.
 # kaggle

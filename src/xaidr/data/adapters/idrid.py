@@ -74,7 +74,7 @@ class IdridAdapter:
         masks = index_files(mask_dir)
         rows = []
         for stem, path in index_files(image_dir).items():
-            row = {
+            row: dict[str, object] = {
                 "dataset": self.name,
                 "image_id": SEG_PREFIX + path.stem,
                 "source_path": path.as_posix(),
@@ -94,12 +94,12 @@ class IdridAdapter:
     def _attach_overlap(self, grading: pd.DataFrame, seg: pd.DataFrame) -> pd.DataFrame:
         """Byte-identical grading twins give a segmentation image its grade; every overlap is logged."""
         by_hash = {sha256_file(Path(p)): (i, g) for p, i, g in
-                   zip(grading["source_path"], grading["image_id"], grading["grade"])}
+                   zip(grading["source_path"], grading["image_id"], grading["grade"], strict=True)}
         seg = seg.copy()
         seg["grade"] = pd.array([pd.NA] * len(seg), dtype="Int64")
         seg["dr_label"] = pd.array([pd.NA] * len(seg), dtype="Int64")
         pairs = []
-        for idx, path in zip(seg.index, seg["source_path"]):
+        for idx, path in zip(seg.index, seg["source_path"], strict=True):
             twin = by_hash.get(sha256_file(Path(path)))
             if twin is not None:
                 pairs.append((seg.at[idx, "image_id"], twin[0]))

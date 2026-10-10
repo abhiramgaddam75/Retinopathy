@@ -6,9 +6,9 @@ that image, so saliency maps and masks stay aligned at the model input size.
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Mapping
 
 import cv2
 import numpy as np
@@ -109,10 +109,10 @@ def preprocess_arrays(
 
 
 def _row_box(row: Mapping) -> Box | None:
-    values = [row.get(c) for c in CROP_COLUMNS]
-    if any(pd.isna(v) for v in values):
+    y0, x0, y1, x1 = (row.get(c) for c in CROP_COLUMNS)
+    if y0 is None or x0 is None or y1 is None or x1 is None or pd.isna([y0, x0, y1, x1]).any():
         return None
-    return tuple(int(v) for v in values)  # type: ignore[return-value]
+    return int(y0), int(x0), int(y1), int(x1)
 
 
 def _row_masks(row: Mapping) -> dict[str, np.ndarray]:
@@ -167,12 +167,14 @@ def build_processed(
         _write_png(target, img)
         for name, mask in masks.items():
             _write_png(out_dir / row["dataset"] / "masks" / name / f"{row['image_id']}.png", mask * 255)
-        update.update(orig_h=source.shape[0], orig_w=source.shape[1], **dict(zip(CROP_COLUMNS, box)))
+        update.update(
+            orig_h=source.shape[0], orig_w=source.shape[1], **dict(zip(CROP_COLUMNS, box, strict=True))
+        )
         return update
 
     with ThreadPoolExecutor(max_workers=max(1, num_workers)) as pool:
         updates = list(tqdm(pool.map(work, df.index), total=len(df), desc="preprocess"))
-    for idx, update in zip(df.index, updates):
+    for idx, update in zip(df.index, updates, strict=True):
         for key, value in update.items():
             df.at[idx, key] = value
     return normalise(df)

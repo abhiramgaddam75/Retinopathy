@@ -5,7 +5,7 @@ augmentation again, so no augmented copy is ever stored or shared with another s
 """
 from __future__ import annotations
 
-from typing import Iterator, Sequence
+from collections.abc import Iterator, Sequence
 
 import pandas as pd
 import torch
