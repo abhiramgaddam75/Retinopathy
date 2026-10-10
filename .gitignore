@@ -1,5 +1,7 @@
 # data, checkpoints and raw logs are never committed (DESIGN.md Section 6)
-/data/
+/data/*
+# the locked split and its hash are committed (DESIGN.md Section 8.5, rule 5)
+!/data/splits/
 /checkpoints/
 *.pt
 *.pth

@@ -1,6 +1,8 @@
 """Albumentations pipelines. ``train_transform`` may only be attached to the training loader."""
 from __future__ import annotations
 
+import random
+
 import albumentations as A
 import cv2
 from albumentations.pytorch import ToTensorV2
@@ -15,12 +17,16 @@ def _check_size(size: int) -> None:
         raise ValueError(f"size must be positive, got {size}")
 
 
-def train_transform(size: int) -> A.Compose:
+def train_transform(size: int, seed: int | None = None) -> A.Compose:
     """Flips, rotation +-30 deg and brightness/contrast jitter, then normalisation.
 
     Flips change the laterality of the optic disc and fovea; this is standard for DR training.
+    Albumentations draws from its own generator, which ``set_seed`` cannot reach, so the
+    pipeline is seeded here: from ``seed``, or from the seeded python generator when omitted.
     """
     _check_size(size)
+    if seed is None:
+        seed = random.randrange(2**32)
     return A.Compose(
         [
             A.HorizontalFlip(p=0.5),
@@ -29,7 +35,8 @@ def train_transform(size: int) -> A.Compose:
             A.RandomBrightnessContrast(p=0.3),
             A.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
             ToTensorV2(),
-        ]
+        ],
+        seed=seed,
     )
 
 

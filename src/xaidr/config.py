@@ -100,7 +100,6 @@ class TrainCfg:
     scheduler: str = "cosine"
     warmup_epochs: int = 2
     amp: bool = True
-    deterministic: bool = True
     num_workers: int = 4
     grad_clip_norm: float = 1.0
     early_stopping: EarlyStoppingCfg = field(default_factory=EarlyStoppingCfg)

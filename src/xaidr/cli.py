@@ -11,8 +11,8 @@ import pandas as pd
 from xaidr.config import Config, ConfigError, load_config
 from xaidr.data.adapters import DataMissingError, get_adapter
 from xaidr.data.manifest import CROP_COLUMNS, ManifestError, normalise, read_manifest, write_manifest
-from xaidr.data.preprocess import build_processed
-from xaidr.data.splits import SplitLockError, make_splits
+from xaidr.data.preprocess import PreprocessError, build_processed
+from xaidr.data.splits import SplitError, make_splits
 from xaidr.logging_utils import setup_logging, write_env
 from xaidr.seed import set_seed
 
@@ -53,10 +53,10 @@ def prepare_data(cfg: Config, datasets: list[str], force: bool) -> None:
     if path.is_file():
         # Keep datasets prepared earlier, and reuse stored transform records so reruns can skip work.
         previous = read_manifest(path)
-        carry = ["split", "orig_h", "orig_w", *CROP_COLUMNS]
+        carry = ["split", "content_hash", "orig_h", "orig_w", *CROP_COLUMNS]
         keyed = previous.set_index(["dataset", "image_id"])[carry]
         joined = manifest.drop(columns=carry).join(keyed, on=["dataset", "image_id"])
-        joined["split"] = joined["split"].fillna("")
+        joined[["split", "content_hash"]] = joined[["split", "content_hash"]].fillna("")
         manifest = pd.concat(
             [previous[~previous["dataset"].isin(datasets)], normalise(joined)], ignore_index=True
         )
@@ -114,7 +114,7 @@ def main(argv: list[str] | None = None) -> int:
         else:
             log.error("step '%s' is not implemented yet (milestone %s)", args.step, PENDING_STEPS[args.step])
             return 2
-    except (ConfigError, DataMissingError, ManifestError, SplitLockError) as exc:
+    except (ConfigError, DataMissingError, ManifestError, PreprocessError, SplitError) as exc:
         log.error("%s", exc)
         return 1
     return 0

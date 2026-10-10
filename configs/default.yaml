@@ -48,7 +48,6 @@ train:
   scheduler: cosine
   warmup_epochs: 2
   amp: true
-  deterministic: true
   num_workers: 4
   grad_clip_norm: 1.0
   early_stopping: {monitor: selection_score, patience: 8}   # D9

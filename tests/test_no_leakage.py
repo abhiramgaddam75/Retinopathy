@@ -1,6 +1,7 @@
 """Leakage rules from DESIGN.md Section 8.5."""
 from __future__ import annotations
 
+import dataclasses
 import re
 from collections import Counter
 from pathlib import Path
@@ -19,7 +20,7 @@ from xaidr.data.dataset import DRDataset, LesionDataset, make_eval_loader, make_
 from xaidr.data.manifest import normalise
 from xaidr.data.oversample import minority_sampler
 from xaidr.data.preprocess import build_processed
-from xaidr.data.splits import make_splits
+from xaidr.data.splits import SplitLockError, make_splits
 
 SIZE = 224
 RANDOM_TRANSFORMS = (A.HorizontalFlip, A.VerticalFlip, A.Rotate, A.RandomBrightnessContrast)
@@ -36,10 +37,11 @@ def prepared(aptos_raw: Path, idrid_raw: Path, tmp_path: Path) -> pd.DataFrame:
 
 
 @pytest.fixture
-def cfg():
+def cfg(tmp_path: Path):
     return load_config(
         REPO_ROOT / "configs" / "default.yaml",
-        [f"data.image_size={SIZE}", "train.batch_size=4", "train.num_workers=0"],
+        [f"data.image_size={SIZE}", "train.batch_size=4", "train.num_workers=0",
+         f"paths.splits={(tmp_path / 'splits').as_posix()}"],
     )
 
 
@@ -136,3 +138,38 @@ def test_dataset_outputs(prepared: pd.DataFrame, cfg) -> None:
 def test_split_lock_is_written(prepared: pd.DataFrame, tmp_path: Path) -> None:
     lock = tmp_path / "splits" / "aptos2019_split.sha256"
     assert lock.is_file() and len(lock.read_text().split()[0]) == 64
+
+
+def test_loaders_refuse_a_manifest_that_differs_from_the_lock(
+    prepared: pd.DataFrame, cfg, tmp_path: Path
+) -> None:
+    edited = prepared.copy()
+    edited.loc[edited["split"] == "test", "split"] = "train"
+    with pytest.raises(SplitLockError, match="does not match the locked split"):
+        make_train_loader(edited, cfg)
+    with pytest.raises(SplitLockError, match="does not match the locked split"):
+        make_eval_loader(edited, "val", cfg)
+    (tmp_path / "splits" / "aptos2019_split.sha256").unlink()
+    with pytest.raises(SplitLockError, match="make-splits"):
+        make_train_loader(prepared, cfg)
+
+
+def first_batches(prepared: pd.DataFrame, cfg, epochs: int = 2) -> list[torch.Tensor]:
+    loader = make_train_loader(prepared, cfg)
+    return [next(iter(loader))[0] for _ in range(epochs)]
+
+
+def test_training_batches_follow_the_seed(prepared: pd.DataFrame, cfg) -> None:
+    first, second = first_batches(prepared, cfg), first_batches(prepared, cfg)
+    assert all(torch.equal(a, b) for a, b in zip(first, second, strict=True))
+    assert not torch.equal(first[0], first[1])  # a new epoch draws new augmentations
+    other = first_batches(prepared, dataclasses.replace(cfg, seed=7))
+    assert not torch.equal(first[0], other[0])
+
+
+@pytest.mark.slow
+def test_training_batches_follow_the_seed_with_workers(prepared: pd.DataFrame, cfg) -> None:
+    workers = dataclasses.replace(cfg, train=dataclasses.replace(cfg.train, num_workers=2))
+    first, second = first_batches(prepared, workers), first_batches(prepared, workers)
+    assert all(torch.equal(a, b) for a, b in zip(first, second, strict=True))
+    assert not torch.equal(first[0], first[1])

@@ -5,6 +5,8 @@ that image, so saliency maps and masks stay aligned at the model input size.
 """
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor
@@ -20,6 +22,7 @@ from xaidr.data.manifest import CROP_COLUMNS, LESIONS, normalise
 log = logging.getLogger(__name__)
 
 Box = tuple[int, int, int, int]  # y0, x0, y1, x1 in source pixels, end-exclusive
+PARAMS_FILE = "preprocess.json"
 
 
 class PreprocessError(RuntimeError):
@@ -28,10 +31,19 @@ class PreprocessError(RuntimeError):
 
 def read_image(path: str | Path) -> np.ndarray:
     """Read a colour image as BGR uint8 (np.fromfile keeps non-ASCII Windows paths working)."""
-    img = cv2.imdecode(np.fromfile(str(path), dtype=np.uint8), cv2.IMREAD_COLOR)
+    return _read_image_and_hash(path)[0]
+
+
+def _read_image_and_hash(path: str | Path) -> tuple[np.ndarray, str]:
+    """Decoded image and the SHA-256 of the file bytes (used to find duplicate images)."""
+    try:
+        data = np.fromfile(str(path), dtype=np.uint8)
+    except OSError as exc:
+        raise PreprocessError(f"cannot read image: {path} ({exc})") from exc
+    img = cv2.imdecode(data, cv2.IMREAD_COLOR) if data.size else None
     if img is None:
         raise PreprocessError(f"cannot read image: {path}")
-    return img
+    return img, hashlib.sha256(data.tobytes()).hexdigest()
 
 
 def read_mask(path: str | Path) -> np.ndarray:
@@ -147,20 +159,35 @@ def build_processed(
     """Write processed images (and masks) and fill ``processed_path`` and the transform record.
 
     Idempotent: a row whose processed file already exists at the right size and whose crop
-    box is already recorded is skipped unless ``force`` is set.
+    box and content hash are already recorded is skipped unless ``force`` is set. The
+    parameters used are stored beside the images; a rerun with different parameters stops
+    unless ``force`` is set, so processed data can never silently disagree with the config.
     """
     df = normalise(manifest_df)
     out_dir = Path(out_dir)
+    params = {
+        "image_size": size, "crop_threshold": crop_threshold,
+        "clip_limit": float(clip_limit), "tile_grid": [int(v) for v in tile_grid],
+    }
+    for dataset in sorted(set(df["dataset"])):
+        record = out_dir / dataset / PARAMS_FILE
+        if record.is_file() and not force:
+            stored = json.loads(record.read_text(encoding="utf-8"))
+            if stored != params:
+                raise PreprocessError(
+                    f"{out_dir / dataset} was built with {stored} but the config now asks for {params}. "
+                    "Rerun prepare-data with --force to rebuild it."
+                )
 
     def work(idx: int) -> dict:
         row = df.loc[idx].to_dict()
         target = out_dir / row["dataset"] / "images" / f"{row['image_id']}.png"
-        update = {"processed_path": target.as_posix()}
-        if not force and target.is_file() and _row_box(row) is not None:
+        update: dict[str, object] = {"processed_path": target.as_posix()}
+        if not force and target.is_file() and _row_box(row) is not None and row["content_hash"]:
             existing = cv2.imdecode(np.fromfile(str(target), dtype=np.uint8), cv2.IMREAD_COLOR)
             if existing is not None and existing.shape[:2] == (size, size):
                 return update
-        source = read_image(row["source_path"])
+        source, update["content_hash"] = _read_image_and_hash(row["source_path"])
         img, masks, box = preprocess_arrays(
             source, _row_masks(row), size, None, crop_threshold, clip_limit, tile_grid
         )
@@ -177,6 +204,9 @@ def build_processed(
     for idx, update in zip(df.index, updates, strict=True):
         for key, value in update.items():
             df.at[idx, key] = value
+    for dataset in sorted(set(df["dataset"])):
+        (out_dir / dataset).mkdir(parents=True, exist_ok=True)
+        (out_dir / dataset / PARAMS_FILE).write_text(json.dumps(params, indent=2), encoding="utf-8")
     return normalise(df)
 
 

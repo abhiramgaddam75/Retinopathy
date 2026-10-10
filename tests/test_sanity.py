@@ -1,8 +1,7 @@
 """Tester sanity tests (VERIFICATION_AND_RESEARCH_BRIEF.md, A3) and Tester-added M0 checks.
 
 S1-S8 and S10 need the metrics, threshold, loss and fidelity modules (milestones M1/M2) and are
-added when those exist. Tests marked xfail document an open defect in docs/DEFECTS.md; they are
-strict, so they start failing the suite as soon as the defect is fixed and the marker must go.
+added when those exist.
 """
 from __future__ import annotations
 
@@ -38,13 +37,14 @@ def prepared(aptos_raw: Path, idrid_raw: Path, tmp_path: Path) -> pd.DataFrame:
     return make_splits(manifest, splits_dir=tmp_path / "splits")
 
 
-def config(*extra: str):
-    return load_config(REPO_ROOT / "configs" / "default.yaml", [*OVERRIDES, *extra])
+def config(tmp_path: Path, *extra: str):
+    splits = f"paths.splits={(tmp_path / 'splits').as_posix()}"
+    return load_config(REPO_ROOT / "configs" / "default.yaml", [*OVERRIDES, splits, *extra])
 
 
-def test_s9_eval_loaders_are_deterministic(prepared: pd.DataFrame) -> None:
+def test_s9_eval_loaders_are_deterministic(prepared: pd.DataFrame, tmp_path: Path) -> None:
     """S9: no random transform on evaluation loaders; two passes give identical outputs."""
-    cfg = config()
+    cfg = config(tmp_path)
     for split in ("val", "test", "external_idrid"):
         loader = make_eval_loader(prepared, split, cfg)
         randomised = [t for t in loader.dataset.transform.transforms
@@ -59,10 +59,10 @@ def test_s9_eval_loaders_are_deterministic(prepared: pd.DataFrame) -> None:
 
 @pytest.mark.parametrize("mode, factor", [("oversample", 3), ("none", 1)])
 def test_training_loader_applies_the_configured_oversampling(
-    prepared: pd.DataFrame, mode: str, factor: int
+    prepared: pd.DataFrame, tmp_path: Path, mode: str, factor: int
 ) -> None:
     """R5: the loader, not only the sampler function, must honour ``minority.mode``."""
-    loader = make_train_loader(prepared, config(f"minority.mode={mode}"))
+    loader = make_train_loader(prepared, config(tmp_path, f"minority.mode={mode}"))
     frame = loader.dataset.df
     base = Counter(frame["grade"].astype(int))
     drawn = Counter(int(frame.loc[i, "grade"]) for i in loader.sampler)
@@ -80,7 +80,6 @@ def test_ablation_configs_differ_only_in_minority_mode() -> None:
     ).to_dict()
 
 
-@pytest.mark.xfail(strict=True, reason="DEF-001: training augmentation ignores the seed")
 def test_training_augmentation_is_reproducible_under_the_seed() -> None:
     """R6: the same seed must give the same augmented training inputs."""
     image = torch.randint(0, 255, (SIZE, SIZE, 3), generator=torch.Generator().manual_seed(0))
@@ -93,10 +92,9 @@ def test_training_augmentation_is_reproducible_under_the_seed() -> None:
     assert torch.equal(runs[0], runs[1])
 
 
-@pytest.mark.xfail(strict=True, reason="DEF-001: training augmentation ignores the seed")
-def test_training_batches_are_reproducible_under_the_seed(prepared: pd.DataFrame) -> None:
+def test_training_batches_are_reproducible_under_the_seed(prepared: pd.DataFrame, tmp_path: Path) -> None:
     """R6: two fresh training loaders with the same seed must yield the same first batch."""
-    cfg = config()
+    cfg = config(tmp_path)
     batches = []
     for _ in range(2):
         set_seed(cfg.seed)

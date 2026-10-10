@@ -44,3 +44,16 @@ def test_prepare_and_split(aptos_raw: Path, idrid_raw: Path, tmp_path: Path) -> 
 
 def test_later_steps_report_their_milestone(tmp_path: Path) -> None:
     assert run(tmp_path, "train") == 2
+
+
+def test_unreadable_image_and_changed_parameters_are_reported(aptos_raw: Path, tmp_path: Path) -> None:
+    image = aptos_raw / "train_images" / "img003.png"
+    good = image.read_bytes()
+    image.write_bytes(b"not a png")
+    assert run(tmp_path, "prepare-data", "--datasets", "aptos2019") == 1
+    assert not (tmp_path / "manifests" / "manifest.csv").exists()
+    image.write_bytes(good)
+    assert run(tmp_path, "prepare-data", "--datasets", "aptos2019") == 0
+    changed = ("prepare-data", "--datasets", "aptos2019", "data.clahe.clip_limit=8.0")
+    assert run(tmp_path, *changed) == 1
+    assert run(tmp_path, *changed[:3], "--force", changed[3]) == 0

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 
 import cv2
@@ -91,6 +92,30 @@ def test_build_processed_records_the_transform(idrid_raw: Path, tmp_path: Path) 
     assert (read_image(target) == 7).all() and again.equals(out)
     build_processed(out, tmp_path / "processed", SIZE, force=True, num_workers=2)
     assert not (read_image(target) == 7).all()
+
+
+def test_build_processed_records_hashes_and_parameters(idrid_raw: Path, tmp_path: Path) -> None:
+    manifest = normalise(IdridAdapter().build_manifest(idrid_raw))
+    out = build_processed(manifest, tmp_path / "processed", SIZE, num_workers=2)
+    by_id = out.set_index("image_id")["content_hash"]
+    assert by_id.str.len().eq(64).all()
+    assert by_id["seg_IDRiD_01"] == by_id["IDRiD_003"] and by_id.nunique() == len(by_id) - 1
+    assert by_id["IDRiD_001"] == hashlib.sha256(
+        (idrid_raw / "grading" / "images" / "IDRiD_001.jpg").read_bytes()
+    ).hexdigest()
+
+    # the same data with other preprocessing parameters is refused unless forced
+    target = Path(out["processed_path"].iloc[0])
+    before = target.read_bytes()
+    for change in ({"clip_limit": 8.0}, {"crop_threshold": 30}, {"tile_grid": (4, 4)}):
+        with pytest.raises(PreprocessError, match="--force"):
+            build_processed(out, tmp_path / "processed", SIZE, num_workers=2, **change)
+    with pytest.raises(PreprocessError, match="--force"):
+        build_processed(out, tmp_path / "processed", SIZE + 32, num_workers=2)
+    assert target.read_bytes() == before
+    build_processed(out, tmp_path / "processed", SIZE, num_workers=2, clip_limit=8.0, force=True)
+    assert target.read_bytes() != before
+    build_processed(out, tmp_path / "processed", SIZE, num_workers=2, clip_limit=8.0)  # now the record
 
 
 def test_supplied_sample_photos_preprocess() -> None:

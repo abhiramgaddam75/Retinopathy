@@ -2,18 +2,19 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Any
+from typing import Any, cast
 
 import cv2
 import numpy as np
 import pandas as pd
 import torch
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader, Dataset, get_worker_info
 
 from xaidr.config import Config
 from xaidr.data.augment import eval_transform, train_transform
 from xaidr.data.oversample import minority_sampler
 from xaidr.data.preprocess import preprocess_record, read_image
+from xaidr.data.splits import verify_split_lock
 
 MISSING_LABEL = -1  # used where a dataset has no five-class grade (e.g. Messidor-2 without a map)
 
@@ -72,16 +73,25 @@ class LesionDataset(Dataset):
         return image, mask_tensors, _label(row["grade"]), row["image_id"]
 
 
+def _seed_worker_augmentation(worker_id: int) -> None:
+    """Give each worker its own augmentation stream, derived from the loader's seeded generator."""
+    info = get_worker_info()
+    if info is not None:
+        cast(Any, info.dataset).transform.set_random_seed(info.seed % 2**32)
+
+
 def make_train_loader(manifest_df: pd.DataFrame, cfg: Config) -> DataLoader:
     """The only loader that augments and oversamples; it only ever sees ``split == 'train'``."""
+    verify_split_lock(manifest_df, cfg.paths.splits)
     train_df = manifest_df[manifest_df["split"] == "train"].reset_index(drop=True)
-    dataset = DRDataset(train_df, train_transform(cfg.data.image_size))
+    dataset = DRDataset(train_df, train_transform(cfg.data.image_size, cfg.seed))
     sampler = minority_sampler(
         train_df, cfg.minority.target_grades, cfg.minority.factor, cfg.seed, cfg.minority.mode
     )
     return DataLoader(
         dataset, batch_size=cfg.train.batch_size, sampler=sampler,
         num_workers=cfg.train.num_workers, drop_last=True, pin_memory=torch.cuda.is_available(),
+        worker_init_fn=_seed_worker_augmentation, generator=torch.Generator().manual_seed(cfg.seed),
     )
 
 
@@ -89,6 +99,7 @@ def make_eval_loader(manifest_df: pd.DataFrame, split: str, cfg: Config) -> Data
     """Deterministic, un-augmented loader for validation, test and external splits."""
     if split == "train":
         raise ValueError("use make_train_loader for the training split")
+    verify_split_lock(manifest_df, cfg.paths.splits)
     subset = manifest_df[manifest_df["split"] == split].reset_index(drop=True)
     dataset = DRDataset(subset, eval_transform(cfg.data.image_size))
     return DataLoader(

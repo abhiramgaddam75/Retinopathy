@@ -12,7 +12,7 @@ MASK_COLUMNS = tuple(f"mask_{name}" for name in LESIONS)
 
 STR_COLUMNS = (
     "dataset", "image_id", "source_path", "label_space", "patient_id",
-    *MASK_COLUMNS, "processed_path", "split",
+    *MASK_COLUMNS, "processed_path", "content_hash", "split",
 )
 INT_COLUMNS = ("grade", "dr_label", "orig_h", "orig_w", "crop_y0", "crop_x0", "crop_y1", "crop_x1")
 BOOL_COLUMNS = ("has_masks",)
@@ -20,7 +20,7 @@ CROP_COLUMNS = ("crop_y0", "crop_x0", "crop_y1", "crop_x1")
 
 COLUMNS = (
     "dataset", "image_id", "source_path", "grade", "dr_label", "label_space", "patient_id",
-    "has_masks", *MASK_COLUMNS, "orig_h", "orig_w", *CROP_COLUMNS, "processed_path", "split",
+    "has_masks", *MASK_COLUMNS, "orig_h", "orig_w", *CROP_COLUMNS, "processed_path", "content_hash", "split",
 )
 
 
