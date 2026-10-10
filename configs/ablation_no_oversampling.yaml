@@ -1,0 +1,4 @@
+base: default.yaml
+
+minority:
+  mode: none

@@ -1,0 +1,7 @@
+base: default.yaml
+
+model:
+  backbone: convnext_tiny
+
+xai:
+  methods: [gradcam_pp, shap, lime]    # attention saliency is undefined for a pure CNN (F6)

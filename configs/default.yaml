@@ -1,0 +1,75 @@
+seed: 42
+deterministic: true
+
+paths:
+  raw: data/raw
+  manifests: data/manifests
+  processed: data/processed/dr512
+  splits: data/splits
+  checkpoints: checkpoints
+  results: results
+
+data:
+  datasets: [aptos2019, idrid, messidor2]
+  image_size: 512
+  crop_threshold: 10
+  clahe: {clip_limit: 2.0, tile_grid: [8, 8]}
+  split_ratios: [0.70, 0.15, 0.15]
+  detection_positive_min_grade: 1      # D5 for APTOS and IDRiD
+  idrid:                               # [VERIFY] against the download, see docs/VERIFICATION.md
+    grading_images: grading/images
+    grading_labels: grading/labels*.csv
+    id_column: Image name
+    grade_column: Retinopathy grade
+    seg_images: segmentation/images
+    seg_masks: segmentation/masks
+  messidor2:
+    images: images
+    label_file: labels.csv             # [VERIFY]
+    id_column: image_id                # [VERIFY]
+    grade_column: adjudicated_dr_grade # [VERIFY]
+    grade_map: {}                      # native grade -> ICDR 0-4; filled after verification (F8)
+    detection_map: {}                  # native grade -> 0/1; filled after verification (F8)
+    detection_definition: referable    # [VERIFY with Researcher]
+
+model:
+  backbone: maxvit_tiny_tf_512         # D1; fallback convnext_tiny
+  pretrained: true
+  head_hidden: 256
+  dropout: 0.3
+
+train:
+  epochs: 30                           # D10
+  batch_size: 16                       # x grad_accum 2 = effective 32
+  grad_accum: 2
+  optimizer: adamw
+  lr: 1.0e-4
+  weight_decay: 0.05
+  scheduler: cosine
+  warmup_epochs: 2
+  amp: true
+  deterministic: true
+  num_workers: 4
+  grad_clip_norm: 1.0
+  early_stopping: {monitor: selection_score, patience: 8}   # D9
+  loss:
+    lambda_det: 0.4
+    lambda_grade: 0.6
+    grade_class_weights: inverse_sqrt_freq
+
+minority:
+  mode: oversample                     # none | oversample (D2)
+  target_grades: [3, 4]
+  factor: 3
+
+xai:
+  methods: [gradcam_pp, shap, lime, attention]
+  gradcam_layer: auto                  # resolved per backbone in xai/gradcam_pp.py
+  fidelity_k_percent: [10, 5, 20]      # D6; first value is primary
+  shap: {segments: [16, 16], nsamples: 512}
+  lime: {num_samples: 1000, hide_color: 0}
+
+eval:
+  bootstrap_iterations: 1000           # D8
+  detection_threshold: youden          # D7
+  chance_monte_carlo: 1000

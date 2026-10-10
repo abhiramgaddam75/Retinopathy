@@ -1,0 +1,23 @@
+# data, checkpoints and raw logs are never committed (DESIGN.md Section 6)
+data/
+checkpoints/
+*.pt
+*.pth
+
+# results: commit summary CSVs, figures, tex tables and env snapshots only
+results/**/*.log
+results/**/*.jsonl
+results/cache/
+
+# supplied sample photos: kept local until the licence check is done (F17)
+tests/fixtures/sample_fundus/*.jpg
+
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ipynb_checkpoints/
+build/
+dist/
+*.zip
