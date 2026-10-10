@@ -1,6 +1,6 @@
 # data, checkpoints and raw logs are never committed (DESIGN.md Section 6)
-data/
-checkpoints/
+/data/
+/checkpoints/
 *.pt
 *.pth
 
