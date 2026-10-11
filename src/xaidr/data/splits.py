@@ -14,6 +14,7 @@ log = logging.getLogger(__name__)
 
 SPLIT_DATASET = "aptos2019"
 EXTERNAL_SPLITS = {"idrid": "external_idrid", "messidor2": "external_messidor2"}
+KEPT, DROPPED_COPY, DROPPED_CONFLICT = "kept", "dropped_duplicate_copy", "dropped_conflicting_grades"
 
 
 class SplitError(RuntimeError):
@@ -79,27 +80,47 @@ def verify_split_lock(manifest_df: pd.DataFrame, splits_dir: str | Path) -> None
 
 
 def _unit_keys(aptos: pd.DataFrame) -> pd.Series:
-    """Splitting unit per image: the patient when known, else the group of byte-identical
-    files the image belongs to (usually just itself). Copies of one photograph therefore
-    never sit in two splits."""
+    """Splitting unit per image: the patient when known, else the image's content hash.
+    Callers pass de-duplicated rows, so a hash names one image; keying on it still guarantees
+    that copies of one photograph could never sit in two splits."""
     key = "dup:" + aptos["content_hash"]
     return key.where(aptos["patient_id"] == "", "pat:" + aptos["patient_id"])
 
 
-def _report_duplicates(df: pd.DataFrame, splits_dir: Path) -> None:
+def _duplicate_actions(aptos: pd.DataFrame) -> pd.Series:
+    """What happens to each APTOS image because of byte-identical copies (Researcher rule, ISSUE-016).
+
+    A group of copies with one grade keeps its first image and drops the rest, so no photograph
+    is weighted or counted twice. A group with conflicting grades has no defined reference
+    label and is dropped from every split.
+    """
+    action = pd.Series(KEPT, index=aptos.index, dtype=object)
+    for _, group in aptos.sort_values("image_id").groupby("content_hash", sort=False):
+        if len(group) == 1:
+            continue
+        if group["grade"].nunique() > 1:
+            action[group.index] = DROPPED_CONFLICT
+        else:
+            action[group.index[1:]] = DROPPED_COPY
+    return action
+
+
+def _report_duplicates(df: pd.DataFrame, action: pd.Series, splits_dir: Path) -> None:
     hashed = df[df["content_hash"] != ""]
-    aptos = hashed[hashed["dataset"] == SPLIT_DATASET]
-    groups = aptos.groupby("content_hash")["grade"].agg(["size", "nunique"])
-    groups = groups[groups["size"] > 1]
-    listing = aptos[aptos["content_hash"].isin(groups.index)].sort_values(["content_hash", "image_id"])
-    listing[["content_hash", "image_id", "grade", "split"]].to_csv(
+    aptos = df.loc[action.index].assign(action=action)
+    sizes = aptos.groupby("content_hash")["image_id"].transform("size")
+    listing = aptos[sizes > 1].sort_values(["content_hash", "image_id"])
+    listing[["content_hash", "image_id", "grade", "action", "split"]].to_csv(
         splits_dir / f"{SPLIT_DATASET}_duplicates.csv", index=False, lineterminator="\n"
     )
-    if len(groups):
+    if len(listing):
+        conflict = listing[listing["action"] == DROPPED_CONFLICT]
         log.warning(
-            "APTOS 2019: %d groups of byte-identical images (%d images); %d groups carry conflicting "
-            "grades. Each group is kept in one split; nothing was removed. See %s_duplicates.csv",
-            len(groups), int(groups["size"].sum()), int((groups["nunique"] > 1).sum()), SPLIT_DATASET,
+            "APTOS 2019: %d groups of byte-identical images (%d images). Dropped %d extra copies of "
+            "same-grade images and %d images in %d groups with conflicting grades; %d images remain. "
+            "See %s_duplicates.csv",
+            listing["content_hash"].nunique(), len(listing), int((listing["action"] == DROPPED_COPY).sum()),
+            len(conflict), conflict["content_hash"].nunique(), int((action == KEPT).sum()), SPLIT_DATASET,
         )
     shared = set(aptos["content_hash"]) & set(hashed.loc[hashed["dataset"] != SPLIT_DATASET, "content_hash"])
     if shared:
@@ -133,10 +154,13 @@ def make_splits(
         raise SplitError(
             "APTOS 2019 rows have no content hash; run `xaidr.cli prepare-data` before make-splits"
         )
-    unit_key = _unit_keys(aptos)
-    units = aptos.assign(unit=unit_key).groupby("unit", sort=True)["grade"].max().rename("label").to_frame()
+    action = _duplicate_actions(aptos)
+    kept = aptos[action == KEPT]
+    unit_key = _unit_keys(kept)
+    units = kept.assign(unit=unit_key).groupby("unit", sort=True)["grade"].max().rename("label").to_frame()
     unit_split = _assign(units, ratios, seed)
-    df.loc[aptos.index, "split"] = unit_key.map(unit_split).to_numpy()
+    df.loc[aptos.index, "split"] = ""  # dropped images belong to no split
+    df.loc[kept.index, "split"] = unit_key.map(unit_split).to_numpy()
 
     table = _split_table(df)
     digest = hashlib.sha256(table).hexdigest()
@@ -152,7 +176,7 @@ def make_splits(
     splits_dir.mkdir(parents=True, exist_ok=True)
     csv_path.write_bytes(table)
     lock_path.write_text(f"{digest}  {csv_path.name}\n", encoding="utf-8")
-    _report_duplicates(df, splits_dir)
-    counts = df.loc[aptos.index].groupby(["split", "grade"]).size().unstack(fill_value=0)
+    _report_duplicates(df, action, splits_dir)
+    counts = df.loc[kept.index].groupby(["split", "grade"]).size().unstack(fill_value=0)
     log.info("APTOS 2019 split (seed %d), images per grade:\n%s", seed, counts)
     return df

@@ -90,14 +90,29 @@ def test_identical_images_stay_in_one_split(tmp_path: Path, caplog: pytest.LogCa
     df.loc[df["image_id"] == "i1", "content_hash"] = df.loc[aptos[0], "content_hash"]
     with caplog.at_level("WARNING"):
         out = make_splits(df, splits_dir=tmp_path)
-    per_hash = out[out["dataset"] == "aptos2019"].groupby("content_hash")["split"].nunique()
-    assert (per_hash == 1).all()
-    listed = pd.read_csv(tmp_path / "aptos2019_duplicates.csv")
+    aptos_out = out[out["dataset"] == "aptos2019"]
+    used = aptos_out[aptos_out["split"] != ""]
+    # one copy of each same-grade pair is kept; conflicting pairs are dropped from every split
+    assert len(used) == 3662 - 260 - 80 and used["content_hash"].is_unique
+    assert set(used["split"]) == {"train", "val", "test"}
+    listed = pd.read_csv(tmp_path / "aptos2019_duplicates.csv", keep_default_na=False)
     assert len(listed) == 600 and listed["content_hash"].nunique() == 300
-    assert "300 groups of byte-identical images (600 images); 40 groups carry conflicting" in caplog.text
+    assert listed["action"].value_counts().to_dict() == {
+        "kept": 260, "dropped_duplicate_copy": 260, "dropped_conflicting_grades": 80,
+    }
+    assert (listed.loc[listed["action"] != "kept", "split"] == "").all()
+    conflicting = listed[listed["action"] == "dropped_conflicting_grades"]
+    assert (conflicting.groupby("content_hash")["grade"].nunique() == 2).all()
+    assert "300 groups of byte-identical images (600 images). Dropped 260 extra copies" in caplog.text
+    assert "80 images in 40 groups with conflicting grades; 3322 images remain" in caplog.text
     assert "byte-identical to an external-test image" in caplog.text
-    fractions = out.loc[out["dataset"] == "aptos2019", "split"].value_counts(normalize=True)
+    fractions = used["split"].value_counts(normalize=True)
     assert abs(fractions["train"] - 0.70) < 0.01
+    verify_split_lock(out, tmp_path)  # dropped images are part of the locked table
+    revived = out.copy()
+    revived.loc[aptos_out.index[aptos_out["split"] == ""][0], "split"] = "train"
+    with pytest.raises(SplitLockError):
+        verify_split_lock(revived, tmp_path)
 
 
 def test_split_needs_content_hashes(tmp_path: Path) -> None:

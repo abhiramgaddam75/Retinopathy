@@ -12,7 +12,7 @@ by milestone (Section 15.1).
 |---|---|---|
 | M0 | Scaffold, config, manifest, adapters, preprocessing, splits, data-layer tests | done, tests pass on synthetic data |
 | M1 | Model, loss, trainer, training run, Table 4 / Table 6 | not started: needs APTOS 2019 and a GPU |
-| M2 | Four explainers, fidelity on IDRiD (Table 5), cross-dataset evaluation | not started: needs IDRiD, Messidor-2 |
+| M2 | Four explainers, fidelity on IDRiD (Table 5), cross-dataset evaluation | fidelity and agreement metrics written and tested on hand-made maps; explainers and evaluation not started: need a trained model, IDRiD, Messidor-2 |
 | M3 | Ablation, efficiency, figures, notebooks | not started |
 | M4 | `make reproduce`, release tag | not started |
 

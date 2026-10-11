@@ -20,6 +20,7 @@ def test_default_config_matches_design() -> None:
     assert (cfg.train.loss.lambda_det, cfg.train.loss.lambda_grade) == (0.4, 0.6)
     assert (cfg.minority.mode, cfg.minority.target_grades, cfg.minority.factor) == ("oversample", (3, 4), 3)
     assert cfg.xai.fidelity_k_percent[0] == 10
+    assert cfg.xai.target == "disease" and cfg.eval.stability_seeds == (42, 43, 44)
     assert isinstance(cfg.paths.raw, Path)
 
 
@@ -50,6 +51,8 @@ def test_overrides() -> None:
         ("minority.target_grades=[3,7]", "minority.target_grades"),
         ("model.backbone=resnet18", "model.backbone"),
         ("minority.mode=smote", "minority.mode"),
+        ("xai.target=grade3", "xai.target"),
+        ("eval.stability_seeds=[42,42]", "eval.stability_seeds"),
         ("train.epoch=3", "train.epoch"),
     ],
 )

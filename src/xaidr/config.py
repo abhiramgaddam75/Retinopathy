@@ -13,6 +13,7 @@ KNOWN_BACKBONES = ("maxvit_tiny_tf_512", "convnext_tiny")
 KNOWN_DATASETS = ("aptos2019", "idrid", "messidor2")
 KNOWN_XAI_METHODS = ("gradcam_pp", "shap", "lime", "attention")
 MINORITY_MODES = ("none", "oversample")
+XAI_TARGETS = ("disease", "predicted")
 
 
 class ConfigError(ValueError):
@@ -117,6 +118,7 @@ class MinorityCfg:
 class XAICfg:
     methods: tuple[str, ...] = KNOWN_XAI_METHODS
     gradcam_layer: str = "auto"
+    target: str = "disease"
     fidelity_k_percent: tuple[float, ...] = (10, 5, 20)
     shap: dict = field(default_factory=dict)
     lime: dict = field(default_factory=dict)
@@ -127,6 +129,7 @@ class EvalCfg:
     bootstrap_iterations: int = 1000
     detection_threshold: str = "youden"
     chance_monte_carlo: int = 1000
+    stability_seeds: tuple[int, ...] = (42, 43, 44)
 
 
 @dataclass(frozen=True)
@@ -291,6 +294,10 @@ def validate(cfg: Config) -> None:
     bad = [x for x in cfg.xai.methods if x not in KNOWN_XAI_METHODS]
     if bad:
         raise ConfigError(f"'xai.methods' has unknown method '{bad[0]}'; known: {KNOWN_XAI_METHODS}")
+    if cfg.xai.target not in XAI_TARGETS:
+        raise ConfigError(f"'xai.target' must be one of {XAI_TARGETS}, got '{cfg.xai.target}'")
+    if len(set(cfg.eval.stability_seeds)) != len(cfg.eval.stability_seeds):
+        raise ConfigError("'eval.stability_seeds' must not repeat a seed")
     if not cfg.xai.fidelity_k_percent or any(not 0 < k < 100 for k in cfg.xai.fidelity_k_percent):
         raise ConfigError("'xai.fidelity_k_percent' must be a non-empty list of values in (0, 100)")
     if cfg.eval.bootstrap_iterations < 1:

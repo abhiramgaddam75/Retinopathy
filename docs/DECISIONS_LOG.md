@@ -19,10 +19,24 @@ Changes to DESIGN.md Section 5, and implementation choices the design left open.
 | 2026-10-10 | `config.py` | Added `data.datasets`, `data.idrid.*`, `data.messidor2.images`, `data.messidor2.detection_map`, `train.grad_clip_norm`. | Section 7.4 needs IDRiD names read from config; D5 needs an explicit Messidor-2 detection mapping; Section 9.2 specifies clipping at 1.0. |
 | 2026-10-10 | `idrid.py` | Segmentation images get the id `seg_<name>`; one combined manifest `data/manifests/manifest.csv` holds all datasets. | Segmentation and grading images are numbered separately; ids must be unique within a dataset (Section 7.3). |
 | 2026-10-10 | `idrid.py` | Overlap between the segmentation and grading sets is detected by SHA-256 of the image files and written to `idrid_overlap.csv`; a byte-identical twin passes its grade to the segmentation row. | Section 7.4 requires overlap to be logged and flagged; the manifest schema has no flag column. Re-encoded copies would not be detected: check when the data arrives. |
-| 2026-10-10 | `preprocess.py` | The cropped field of view is resized straight to 512 x 512 without padding to a square. | Section 7.5 specifies crop, CLAHE, resize. Images whose retina is cut off at the top and bottom are therefore stretched vertically; masks get the identical transform, so alignment holds. Padding to a square first would avoid the stretch; raise with the Designer if wanted. |
+| 2026-10-10 | `preprocess.py` | **Superseded on 2026-10-11 (ISSUE-015): the crop is now padded to a square.** Originally: the cropped field of view is resized straight to 512 x 512 without padding to a square. | Section 7.5 specifies crop, CLAHE, resize. Images whose retina is cut off at the top and bottom are therefore stretched vertically; masks get the identical transform, so alignment holds. Padding to a square first would avoid the stretch; raise with the Designer if wanted. |
 | 2026-10-10 | `dataset.py` | `LesionDataset(manifest_df, size, transform=None)` takes the size and rebuilds masks from the source masks with the stored crop box. `make_train_loader` / `make_eval_loader` live here. | One code path for mask geometry (Section 4.2 rule 2); gives the leakage tests a single place where `train_transform` is used. |
 | 2026-10-10 | `dataset.py` | A missing label is returned as `-1`. | Messidor-2 rows may have no five-class grade (Section 8.3). |
 | 2026-10-10 | `cli.py` | `prepare-data` fails when a configured dataset folder is missing; `--datasets` selects a subset. | "If a dataset file is missing, stop and ask" (Section 0). |
+
+## Changes for Researcher issues (docs/ISSUE_LOG.md), 2026-10-11
+
+For the Tester to re-test and the Researcher to close. Several change DESIGN.md; the Designer has
+not signed these off (open question 6 in docs/SCIENTIFIC_REVIEW.md).
+
+| Issue | Change | Departs from the design? |
+|---|---|---|
+| ISSUE-015 (DEF-007) | The field-of-view crop is centred on a black square (`pad_to_square`) before resizing, for images and masks alike, so the aspect ratio is kept. The padding is a function of the crop size, so the crop box in the manifest still describes the full geometry and no column was added. `preprocess.json` records `pad_to_square`, so data built the old way is refused. | Yes: Section 7.5 (crop, CLAHE, resize) |
+| ISSUE-016 (DEF-002) | `make-splits` keeps one image (the first by id) from each group of byte-identical same-grade copies and drops the rest. Groups with conflicting grades are dropped from every split; the Researcher allowed "training only, or drop", and dropping avoids training on one photograph with two labels. Dropped images have an empty `split` and are listed with an `action` in `aptos2019_duplicates.csv`; they are part of the locked table. Counts are logged. | Extends Section 7.6 |
+| ISSUE-014 | `xai/fidelity.py` implemented (it is an M2 module; done now because it needs no data). Each (lesion, k) row carries IoU, Dice, pointing, **lesion recall at k**, their chance values, the **maximum attainable IoU and Dice**, and the lesion's share of the field of view. Chance IoU and Dice sample the hypergeometric overlap directly instead of drawing 1,000 random maps; the distribution is the same. `holm_adjust` is provided for the 20 primary comparisons. New config key `xai.target`, default `disease` (grades 1-4 together), replacing "explain the predicted grade". | Yes: D11; Section 7.21 columns; Table 5 gains columns |
+| ISSUE-013 | `xai/stability.py` implemented (Proposal A, Spearman over field-of-view pixels). New config key `eval.stability_seeds: [42, 43, 44]`. **Not done:** the three training runs and the per-dataset report, which need data and a GPU. | Yes: D12 becomes three seeds if stability is to be claimed |
+| ISSUE-017 | **Not done.** The grading-only baseline needs the model code (M1). Planned as one extra config, `baseline_grading_only.yaml`, if the team wants the comparison. | Adds a run |
+| ISSUE-012 | No code change: the code already follows the facts (IDRiD external, EyePACS disabled, `pytorch-grad-cam`). The paper is what changes. | No |
 
 ## Fixes for Tester defects (docs/DEFECTS.md), 2026-10-10
 

@@ -64,6 +64,7 @@ minority:
 xai:
   methods: [gradcam_pp, shap, lime, attention]
   gradcam_layer: auto                  # resolved per backbone in xai/gradcam_pp.py
+  target: disease                      # disease = grades 1-4 together (ISSUE-014) | predicted = argmax grade
   fidelity_k_percent: [10, 5, 20]      # D6; first value is primary
   shap: {segments: [16, 16], nsamples: 512}
   lime: {num_samples: 1000, hide_color: 0}
@@ -72,3 +73,4 @@ eval:
   bootstrap_iterations: 1000           # D8
   detection_threshold: youden          # D7
   chance_monte_carlo: 1000
+  stability_seeds: [42, 43, 44]        # between-seed explanation agreement (ISSUE-013)

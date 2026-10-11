@@ -15,6 +15,7 @@ from xaidr.data.preprocess import (
     apply_clahe,
     build_processed,
     crop_fov,
+    pad_to_square,
     preprocess_arrays,
     preprocess_record,
     read_image,
@@ -56,6 +57,25 @@ def test_mask_and_image_stay_aligned() -> None:
     gray = cv2.cvtColor(out_img, cv2.COLOR_BGR2GRAY).astype(int)
     square = gray > (gray.max() + np.median(gray[gray > 0])) / 2
     assert np.abs(np.subtract(bbox(square), bbox(out_masks["EX"]))).max() <= 1
+
+
+def test_cut_off_retina_is_padded_not_stretched() -> None:
+    """A disc cut off at the top and bottom keeps its shape; image and mask stay aligned."""
+    img = np.zeros((200, 420, 3), np.uint8)
+    cv2.circle(img, (210, 100), 150, (40, 40, 40), -1)  # 300 px wide, only 200 px visible
+    mask = np.zeros((200, 420), np.uint8)
+    mask[60:100, 180:220] = 255  # a square lesion
+    img[mask > 0] = 255
+    out_img, out_masks, box = preprocess_arrays(img, {"EX": mask}, SIZE)
+    assert box == (0, 60, 200, 361)
+    y0, x0, y1, x1 = bbox(out_masks["EX"])
+    assert abs((y1 - y0) - (x1 - x0)) <= 1  # the square is still square
+    assert not out_img[:35].any() and not out_img[-35:].any()  # black bands above and below
+    gray = cv2.cvtColor(out_img, cv2.COLOR_BGR2GRAY).astype(int)
+    square = gray > (gray.max() + np.median(gray[gray > 0])) / 2
+    assert np.abs(np.subtract(bbox(square), bbox(out_masks["EX"]))).max() <= 1
+    assert pad_to_square(np.ones((3, 7), np.uint8)).shape == (7, 7)
+    assert pad_to_square(np.ones((7, 3, 3), np.uint8)).shape == (7, 7, 3)
 
 
 def test_clahe_is_never_applied_to_masks() -> None:

@@ -1,4 +1,4 @@
-"""Border crop, CLAHE and resize, applied identically to images and lesion masks.
+"""Border crop, CLAHE, square padding and resize, applied identically to images and masks.
 
 The crop box found on the image is stored in the manifest and reused for every mask of
 that image, so saliency maps and masks stay aligned at the model input size.
@@ -86,6 +86,20 @@ def apply_clahe(
     return cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)
 
 
+def pad_to_square(arr: np.ndarray) -> np.ndarray:
+    """Centre the array on a black square so that resizing keeps the aspect ratio.
+
+    The padding is a function of the crop size alone, so the crop box stored in the manifest
+    still fully describes the geometry applied to an image and its masks.
+    """
+    h, w = arr.shape[:2]
+    side = max(h, w)
+    top, left = (side - h) // 2, (side - w) // 2
+    return cv2.copyMakeBorder(
+        arr, top, side - h - top, left, side - w - left, cv2.BORDER_CONSTANT, value=0
+    )
+
+
 def resize_image(img: np.ndarray, size: int) -> np.ndarray:
     return cv2.resize(img, (size, size), interpolation=cv2.INTER_AREA)
 
@@ -104,19 +118,19 @@ def preprocess_arrays(
     clip_limit: float = 2.0,
     tile_grid: tuple[int, int] = (8, 8),
 ) -> tuple[np.ndarray, dict[str, np.ndarray], Box]:
-    """Crop, CLAHE (image only) and resize; masks get the same crop box and nearest resize."""
+    """Crop, CLAHE (image only), pad to a square and resize; masks get the same geometry."""
     if box is None:
         cropped, box = crop_fov(img_bgr, crop_threshold)
     else:
         cropped = apply_crop(img_bgr, box)
-    out_img = resize_image(apply_clahe(cropped, clip_limit, tile_grid), size)
+    out_img = resize_image(pad_to_square(apply_clahe(cropped, clip_limit, tile_grid)), size)
     out_masks = {}
     for name, mask in masks.items():
         if mask.shape[:2] != img_bgr.shape[:2]:
             raise PreprocessError(
                 f"mask '{name}' is {mask.shape[:2]} but its image is {img_bgr.shape[:2]}"
             )
-        out_masks[name] = resize_mask(apply_crop(mask, box), size)
+        out_masks[name] = resize_mask(pad_to_square(apply_crop(mask, box)), size)
     return out_img, out_masks, box
 
 
@@ -168,6 +182,7 @@ def build_processed(
     params = {
         "image_size": size, "crop_threshold": crop_threshold,
         "clip_limit": float(clip_limit), "tile_grid": [int(v) for v in tile_grid],
+        "pad_to_square": True,
     }
     for dataset in sorted(set(df["dataset"])):
         record = out_dir / dataset / PARAMS_FILE
