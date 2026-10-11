@@ -1,0 +1,98 @@
+data:
+  clahe:
+    clip_limit: 2.0
+    tile_grid:
+    - 8
+    - 8
+  crop_threshold: 10
+  datasets:
+  - aptos2019
+  - idrid
+  - messidor2
+  detection_positive_min_grade: 1
+  idrid:
+    grade_column: Retinopathy grade
+    grading_images: grading/images
+    grading_labels: grading/labels*.csv
+    id_column: Image name
+    seg_images: segmentation/images
+    seg_masks: segmentation/masks
+  image_size: 256
+  messidor2:
+    detection_definition: referable
+    detection_map: {}
+    grade_column: adjudicated_dr_grade
+    grade_map: {}
+    id_column: image_id
+    images: images
+    label_file: labels.csv
+  split_ratios:
+  - 0.7
+  - 0.15
+  - 0.15
+deterministic: true
+eval:
+  bootstrap_iterations: 1000
+  chance_monte_carlo: 1000
+  detection_threshold: youden
+  stability_seeds:
+  - 42
+  - 43
+  - 44
+minority:
+  factor: 3
+  mode: oversample
+  target_grades:
+  - 3
+  - 4
+model:
+  backbone: convnext_tiny
+  dropout: 0.3
+  head_hidden: 256
+  pretrained: true
+paths:
+  checkpoints: checkpoints
+  manifests: data/manifests_256
+  processed: data/processed/dr256
+  raw: data/raw
+  results: results
+  splits: data/splits
+seed: 42
+train:
+  amp: true
+  batch_size: 16
+  early_stopping:
+    monitor: selection_score
+    patience: 8
+  epochs: 20
+  grad_accum: 2
+  grad_clip_norm: 1.0
+  loss:
+    grade_class_weights: inverse_sqrt_freq
+    lambda_det: 0.4
+    lambda_grade: 0.6
+  lr: 0.0001
+  num_workers: 6
+  optimizer: adamw
+  scheduler: cosine
+  warmup_epochs: 2
+  weight_decay: 0.05
+xai:
+  fidelity_k_percent:
+  - 10.0
+  - 5.0
+  - 20.0
+  gradcam_layer: auto
+  lime:
+    hide_color: 0
+    num_samples: 1000
+  methods:
+  - gradcam_pp
+  - shap
+  - lime
+  shap:
+    nsamples: 512
+    segments:
+    - 16
+    - 16
+  target: disease

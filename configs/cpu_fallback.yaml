@@ -1,0 +1,23 @@
+# CPU fallback run: NOT the model specified in DESIGN.md.
+# The specified model (maxvit_tiny_tf_512 at 512 px) needs about 3.5 days on the project laptop
+# (measured: 3.3 s per image, no GPU). This config exists so that the whole pipeline can be run
+# and checked end to end on real data without a GPU. Its numbers must be reported as
+# "ConvNeXt-Tiny, 256 px, CPU fallback" and never as the proposed framework's headline result.
+base: default.yaml
+
+paths:
+  manifests: data/manifests_256
+  processed: data/processed/dr256
+
+data:
+  image_size: 256
+
+model:
+  backbone: convnext_tiny
+
+train:
+  epochs: 20
+  num_workers: 2
+
+xai:
+  methods: [gradcam_pp, shap, lime]    # attention saliency is undefined for a pure CNN (F6)

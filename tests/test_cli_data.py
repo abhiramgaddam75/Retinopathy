@@ -43,7 +43,7 @@ def test_prepare_and_split(aptos_raw: Path, idrid_raw: Path, tmp_path: Path) -> 
 
 
 def test_later_steps_report_their_milestone(tmp_path: Path) -> None:
-    assert run(tmp_path, "train") == 2
+    assert run(tmp_path, "xai") == 2
 
 
 def test_unreadable_image_and_changed_parameters_are_reported(aptos_raw: Path, tmp_path: Path) -> None:

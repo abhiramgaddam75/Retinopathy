@@ -21,8 +21,7 @@ log = logging.getLogger("xaidr")
 MANIFEST_NAME = "manifest.csv"
 # Steps that land in later milestones (DESIGN.md Section 15.1).
 PENDING_STEPS = {
-    "train": "M1", "evaluate": "M1", "xai": "M2", "crossdataset": "M2",
-    "ablation": "M3", "efficiency": "M3", "figures": "M3", "all": "M4",
+    "xai": "M2", "crossdataset": "M2", "ablation": "M3", "efficiency": "M3", "figures": "M3", "all": "M4",
 }
 
 
@@ -93,6 +92,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--force", action="store_true", help="re-process images that already exist")
     p = add("make-splits", "stratified, locked APTOS 2019 split")
     p.add_argument("--resplit", action="store_true", help="replace a locked split")
+    p = add("train", "train the dual-head model; prints the run id")
+    p.add_argument("--resume", metavar="RUN_ID", help="continue a run from its last.pt")
+    p = add("evaluate", "Table 4 and Table 6 on the APTOS 2019 test split")
+    p.add_argument("--run", required=True, help="run id under checkpoints/")
     for name, milestone in PENDING_STEPS.items():
         p = add(name, f"(milestone {milestone})")
         p.add_argument("--run", help="run id under checkpoints/")
@@ -111,6 +114,22 @@ def main(argv: list[str] | None = None) -> int:
             write_env(cfg.paths.results, cfg.to_dict())
         elif args.step == "make-splits":
             run_make_splits(cfg, args.resplit)
+        elif args.step == "train":
+            from xaidr.training.run import train_run
+
+            run_dir = train_run(cfg, manifest_path(cfg), args.resume)
+            write_env(cfg.paths.results, cfg.to_dict())
+            log.info("run id: %s", run_dir.name)
+        elif args.step == "evaluate":
+            from xaidr.eval.evaluate_grading import evaluate_run
+            from xaidr.training.run import CONFIG_SNAPSHOT
+
+            run_dir = cfg.paths.checkpoints / args.run
+            if not (run_dir / "best.pt").is_file():
+                raise DataMissingError(f"no trained model at {run_dir / 'best.pt'}")
+            # evaluate with the config the run was trained with, not the current default
+            run_cfg = load_config(run_dir / CONFIG_SNAPSHOT, args.overrides)
+            evaluate_run(run_cfg, run_dir, manifest_path(run_cfg))
         else:
             log.error("step '%s' is not implemented yet (milestone %s)", args.step, PENDING_STEPS[args.step])
             return 2

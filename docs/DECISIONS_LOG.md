@@ -24,6 +24,20 @@ Changes to DESIGN.md Section 5, and implementation choices the design left open.
 | 2026-10-10 | `dataset.py` | A missing label is returned as `-1`. | Messidor-2 rows may have no five-class grade (Section 8.3). |
 | 2026-10-10 | `cli.py` | `prepare-data` fails when a configured dataset folder is missing; `--datasets` selects a subset. | "If a dataset file is missing, stop and ask" (Section 0). |
 
+## Milestone M1 and the first real data, 2026-10-11
+
+| Topic | Decision or fact | Reason |
+|---|---|---|
+| APTOS 2019 on disk | 3,662 labelled images; grades 0-4: 1,805 / 370 / 999 / 193 / 295. `train.csv` SHA-256 `B2A34796...DD79A5`. | Matches the published dataset (brief Section 2). |
+| Duplicates measured | 123 groups of byte-identical images (251 images). 96 extra same-grade copies and 62 images in 30 conflicting-grade groups were dropped; **3,504 images remain**: train 2,452, validation 526, test 526. | DEF-002 / ISSUE-016 on real data. The paper's "one image per patient" sentence is wrong for APTOS. |
+| Learning-rate schedule | Stepped once per epoch: linear warm-up over `warmup_epochs`, then cosine decay; the first cosine epoch is at the peak rate. | DESIGN 7.13 does not say per step or per epoch. |
+| Validation loss | Computed on CPU from the stored probabilities with the same loss weights as training. | One prediction pass per epoch serves loss, QWK and AUC. |
+| Pooled features | The backbone's own pooling and normalisation (`forward_head(pre_logits=True)`); 512 features for MaxViT-Tiny, 768 for ConvNeXt-Tiny. | DESIGN 7.10. |
+| Pretrained weights | timm's default tag for each name. For `convnext_tiny` that is `in12k_ft_in1k` (ImageNet-12k, fine-tuned on ImageNet-1k); for `maxvit_tiny_tf_512` it is `in1k`. | DESIGN says "ImageNet-pretrained weights from timm"; the paper must name the tag. |
+| Table 6 literature rows | Written with a `note` column carrying each row's verification status. The Akhtar et al. row from the draft is replaced by Shakibania et al. [27]; Dinpajhouh [50] is marked NOT VERIFIED. | DESIGN 7.23 says "copied verbatim from paper", but the Researcher found those rows wrong (ISSUE-009). |
+| **No GPU: CPU fallback run** | The specified model needs about 3.5 days on the laptop (measured 3.31 s per image). `configs/cpu_fallback.yaml` trains `convnext_tiny` at 256 px, at most 20 epochs, same split and seed. **Departs from D1 and the 512 px input.** Its results are a fallback baseline, not the proposed framework's result. The specified run is described in `docs/TRAINING_ON_GPU.md`. | Risk register, "No GPU for the team": reduce the model and record every change. |
+| OOM fallback | Not automatic. Rerun with `train.batch_size=8 train.grad_accum=4`; the override is saved in the run's config snapshot. | DESIGN 9.2 asks that the change be recorded, not silent. |
+
 ## Changes for Researcher issues (docs/ISSUE_LOG.md), 2026-10-11
 
 For the Tester to re-test and the Researcher to close. Several change DESIGN.md; the Designer has
