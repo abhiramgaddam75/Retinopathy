@@ -22,7 +22,7 @@ log = logging.getLogger("xaidr")
 MANIFEST_NAME = "manifest.csv"
 # Steps that land in later milestones (DESIGN.md Section 15.1).
 PENDING_STEPS = {
-    "xai": "M2", "crossdataset": "M2", "efficiency": "M3", "figures": "M3", "all": "M4",
+    "crossdataset": "M2", "all": "M4",
 }
 
 
@@ -100,6 +100,15 @@ def build_parser() -> argparse.ArgumentParser:
     p = add("ablation", "paired comparison of an oversampling run with a no-oversampling run")
     p.add_argument("--run", required=True, help="run id trained with minority.mode=oversample")
     p.add_argument("--against", required=True, help="run id trained with minority.mode=none")
+    for name, text in (
+        ("xai", "explanation fidelity against lesion masks (Table 5)"),
+        ("efficiency", "parameters, size, latency and memory of a run"),
+        ("figures", "confusion matrix, training curves and class distribution"),
+    ):
+        p = add(name, text)
+        p.add_argument("--run", required=True, help="run id under checkpoints/")
+        if name == "xai":
+            p.add_argument("--limit", type=int, help="only the first N lesion-annotated images")
     for name, milestone in PENDING_STEPS.items():
         p = add(name, f"(milestone {milestone})")
         p.add_argument("--run", help="run id under checkpoints/")
@@ -134,6 +143,29 @@ def main(argv: list[str] | None = None) -> int:
             # evaluate with the config the run was trained with, not the current default
             run_cfg = load_config(run_dir / CONFIG_SNAPSHOT, args.overrides)
             evaluate_run(run_cfg, run_dir, manifest_path(run_cfg))
+        elif args.step in ("xai", "efficiency", "figures"):
+            from xaidr.training.run import CONFIG_SNAPSHOT
+
+            run_dir = cfg.paths.checkpoints / args.run
+            if not (run_dir / "best.pt").is_file():
+                raise DataMissingError(f"no trained model at {run_dir / 'best.pt'}")
+            run_cfg = load_config(run_dir / CONFIG_SNAPSHOT, args.overrides)
+            if args.step == "xai":
+                from xaidr.eval.xai_fidelity import run_fidelity
+
+                run_fidelity(run_cfg, run_dir, manifest_path(run_cfg), args.limit)
+            elif args.step == "efficiency":
+                from xaidr.eval.efficiency import benchmark_run
+
+                benchmark_run(run_cfg, run_dir)
+            else:
+                from xaidr.eval.evaluate_grading import method_label
+                from xaidr.viz.figures import write_run_figures
+
+                manifest = read_manifest(manifest_path(run_cfg))
+                label = method_label(run_cfg)
+                for path in write_run_figures(run_dir, manifest, run_cfg.paths.results, label):
+                    log.info("wrote %s", path)
         elif args.step == "ablation":
             from xaidr.eval.ablation import write_ablation
             from xaidr.eval.evaluate_grading import predict_test_split

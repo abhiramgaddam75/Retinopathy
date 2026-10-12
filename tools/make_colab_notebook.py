@@ -63,8 +63,8 @@ CELLS: list[tuple[str, str]] = [
 def main() -> None:
     notebook = nbformat.v4.new_notebook()
     for kind, source in CELLS:
-        cell = nbformat.v4.new_markdown_cell(source) if kind == "markdown" else nbformat.v4.new_code_cell(source)
-        notebook.cells.append(cell)
+        make = nbformat.v4.new_markdown_cell if kind == "markdown" else nbformat.v4.new_code_cell
+        notebook.cells.append(make(source))
     notebook.metadata["accelerator"] = "GPU"
     notebook.metadata["colab"] = {"gpuType": "T4", "provenance": []}
     notebook.metadata["kernelspec"] = {"display_name": "Python 3", "name": "python3"}
