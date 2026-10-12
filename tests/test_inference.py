@@ -109,7 +109,7 @@ def test_demo_app_renders_a_sample_without_errors() -> None:
     from streamlit.testing.v1 import AppTest
 
     app = AppTest.from_file(str(REPO_ROOT / "app" / "demo_app.py"), default_timeout=120).run()
-    assert not app.exception and "Diabetic retinopathy" in app.title[0].value
+    assert not app.exception and "Diabetic Retinopathy" in app.title[0].value
     assert any("Upload a fundus photograph or pick a sample" in box.value for box in app.info)
     app.selectbox[0].select("Sample 5").run()
     assert not app.exception
