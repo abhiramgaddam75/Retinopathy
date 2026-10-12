@@ -1,0 +1,2 @@
+model,run_id,input_px,batch_size,device,device_type,precision,cpu_threads,params_total,params_trainable,weights_mb,checkpoint_mb,latency_median_ms,latency_q25_ms,latency_q75_ms,latency_iqr_ms,n_timed,n_warmup,peak_gpu_memory_mb
+"Fallback baseline, NOT the specified model (this study): convnext_tiny, 256 px",20261011-222646_convnext_tiny_oversample_seed42,256,1,"Intel64 Family 6 Model 140 Stepping 1, GenuineIntel",cpu,fp32,4,28215398,28215398,112.861592,338.775997,97.6090500043938,92.21359999537526,107.4915749959473,15.277975000572042,200,20,

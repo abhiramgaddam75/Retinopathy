@@ -34,7 +34,8 @@ of record for the submission is the CPU fallback: ConvNeXt-Tiny at 256 px**
 | Model of record | ConvNeXt-Tiny, 256 px, 20 epochs, seed 42: run `20261011-222646_convnext_tiny_oversample_seed42`. |
 | Results on disk | `results/table4_detection_grading_aptos_test.csv`, `table6_comparative.csv`, `figures/`, and when produced `ablation_minority.csv`, `efficiency.csv`. |
 | Not produced | Table 5 (explanation fidelity) and the cross-dataset summary: both need IDRiD; Messidor-2 as well for the latter. The code for both is written and tested on synthetic data. |
-| Ablation | Two 5-epoch arms of the fallback model, compared with a paired bootstrap. |
+| Ablation | Done: `results/ablation_minority.csv`. Two 5-epoch arms of the fallback model (`20261012-102317_convnext_tiny_none_seed42`, `20261012-112520_convnext_tiny_oversample_seed42`), paired bootstrap on the 526 test images. Oversampling raised Proliferative sensitivity and lowered Severe sensitivity; QWK and detection AUC did not change. One run per arm. |
+| Efficiency | Done on the laptop CPU: `results/efficiency.csv` (28.2 M parameters, median 98 ms per image at 256 px, 4 threads). No GPU figures. |
 | Reviews | Tester: `docs/TEST_REPORT.md`, `docs/DEFECTS.md`. Researcher: `docs/SCIENTIFIC_REVIEW.md`. Issues: `docs/ISSUE_LOG.md`. Paper corrections are open and belong to the authors. |
 | Git | All work is committed locally on `main`. **Not pushed**: GitHub has only the initial commit. |
 

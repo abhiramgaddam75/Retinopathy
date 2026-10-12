@@ -41,7 +41,7 @@ eval:
   - 44
 minority:
   factor: 3
-  mode: none
+  mode: oversample
   target_grades:
   - 3
   - 4
