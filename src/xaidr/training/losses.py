@@ -41,4 +41,5 @@ class JointDRLoss(nn.Module):
         det = F.binary_cross_entropy_with_logits(det_logit.float(), dr_label.float())
         grading = F.cross_entropy(grade_logits.float(), grade.long(), weight=self.grade_class_weights)
         total = self.lambda_det * det + self.lambda_grade * grading
-        return total, {"loss": float(total), "loss_det": float(det), "loss_grade": float(grading)}
+        parts = {"loss": total.item(), "loss_det": det.item(), "loss_grade": grading.item()}
+        return total, parts
