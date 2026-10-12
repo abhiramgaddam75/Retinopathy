@@ -45,6 +45,17 @@ LITERATURE_ROWS = [
 ]
 
 
+SPECIFIED_MODEL = ("maxvit_tiny_tf_512", 512)  # D1 and the 512 px input of DESIGN.md
+
+
+def method_label(cfg: Config) -> str:
+    """Row label for this build; a run that is not the specified model says so in its name."""
+    model = f"{cfg.model.backbone}, {cfg.data.image_size} px"
+    if (cfg.model.backbone, cfg.data.image_size) == SPECIFIED_MODEL:
+        return f"Proposed framework (this study): {model}"
+    return f"Fallback baseline, NOT the specified model (this study): {model}"
+
+
 def _row(task: str, name: str, fn: M.MetricFn, y: np.ndarray, values: np.ndarray, n_boot: int) -> dict:
     estimate, lo, hi = M.bootstrap_ci(fn, y, values, n=n_boot)
     return {"task": task, "metric": name, "value": estimate, "ci_lo": lo, "ci_hi": hi, "n": len(y)}
@@ -80,6 +91,7 @@ def evaluate_run(cfg: Config, run_dir: Path, manifest_path: Path) -> pd.DataFram
     table = table4_rows(predictions, threshold, cfg.eval.bootstrap_iterations)
     table["detection_threshold"] = threshold
     table["dataset"] = "aptos2019_test"
+    table["model"] = method_label(cfg)
     table["run_id"] = run_dir.name
     results = cfg.paths.results
     results.mkdir(parents=True, exist_ok=True)
@@ -95,7 +107,7 @@ def evaluate_run(cfg: Config, run_dir: Path, manifest_path: Path) -> pd.DataFram
 
     by_metric = table[table["task"] == "grading"].set_index("metric")
     proposed = {
-        "method": "Proposed framework (this study)", "dataset": "APTOS 2019 (held-out 15% test split)",
+        "method": method_label(cfg), "dataset": "APTOS 2019 (held-out 15% test split)",
         "grading_accuracy": by_metric.loc["accuracy", "value"], "qwk": by_metric.loc["qwk", "value"],
         "qwk_ci_lo": by_metric.loc["qwk", "ci_lo"], "qwk_ci_hi": by_metric.loc["qwk", "ci_hi"],
         "source": f"this build, run {run_dir.name}", "note": f"n = {len(predictions)}; one seed",

@@ -1,0 +1,9 @@
+task,metric,value,ci_lo,ci_hi,n,detection_threshold,dataset,model,run_id
+detection,accuracy,0.9885931558935361,0.9790874524714829,0.9961977186311787,526,0.7895740866661072,aptos2019_test,"Fallback baseline, NOT the specified model (this study): convnext_tiny, 256 px",20261011-222646_convnext_tiny_oversample_seed42
+detection,sensitivity,0.984375,0.96875,0.99609375,526,0.7895740866661072,aptos2019_test,"Fallback baseline, NOT the specified model (this study): convnext_tiny, 256 px",20261011-222646_convnext_tiny_oversample_seed42
+detection,specificity,0.9925925925925926,0.9814814814814815,1.0,526,0.7895740866661072,aptos2019_test,"Fallback baseline, NOT the specified model (this study): convnext_tiny, 256 px",20261011-222646_convnext_tiny_oversample_seed42
+detection,auc,0.9979890046296297,0.9946466290509259,0.9999131944444444,526,0.7895740866661072,aptos2019_test,"Fallback baseline, NOT the specified model (this study): convnext_tiny, 256 px",20261011-222646_convnext_tiny_oversample_seed42
+grading,accuracy,0.8669201520912547,0.8422053231939164,0.8916349809885932,526,0.7895740866661072,aptos2019_test,"Fallback baseline, NOT the specified model (this study): convnext_tiny, 256 px",20261011-222646_convnext_tiny_oversample_seed42
+grading,macro_sensitivity,0.6940574973950933,0.640528429004452,0.7493699677938809,526,0.7895740866661072,aptos2019_test,"Fallback baseline, NOT the specified model (this study): convnext_tiny, 256 px",20261011-222646_convnext_tiny_oversample_seed42
+grading,macro_auc,0.9573754247711829,0.9461479209404496,0.9687270444023762,526,0.7895740866661072,aptos2019_test,"Fallback baseline, NOT the specified model (this study): convnext_tiny, 256 px",20261011-222646_convnext_tiny_oversample_seed42
+grading,qwk,0.9095887663946755,0.8900018614432375,0.9289691907822736,526,0.7895740866661072,aptos2019_test,"Fallback baseline, NOT the specified model (this study): convnext_tiny, 256 px",20261011-222646_convnext_tiny_oversample_seed42

@@ -61,7 +61,10 @@ def test_prepare_split_train_evaluate(aptos_raw: Path, tmp_path: Path) -> None:
     assert ((table["ci_lo"] <= table["value"] + 1e-9) & (table["value"] <= table["ci_hi"] + 1e-9)).all()
     assert (predictions[[f"p{g}" for g in range(5)]].sum(axis=1) - 1).abs().max() < 1e-4
     table6 = pd.read_csv(tmp_path / "results" / "table6_comparative.csv")
-    proposed = table6[table6["method"].str.startswith("Proposed")].iloc[0]
+    proposed = table6.iloc[-1]
+    assert proposed["method"].startswith("Fallback baseline, NOT the specified model")
+    assert proposed["method"].endswith("convnext_tiny, 224 px")
+    assert (table["model"] == proposed["method"]).all()
     qwk = table[table["metric"] == "qwk"].iloc[0]["value"]
     assert proposed["qwk"] == qwk and (table6["source"].iloc[:-1] == "published").all()
     assert (run_dir / "confusion_matrix_test.csv").is_file()

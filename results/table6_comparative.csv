@@ -1,0 +1,5 @@
+method,dataset,grading_accuracy,qwk,source,note,qwk_ci_lo,qwk_ci_hi
+"Chilukoti et al. [48], 2024",APTOS 2019,,0.967,published,"Checked against the source. EyePACS-pretrained, fine-tuned, checkpoint ensemble; APTOS split not reported, so not comparable with a held-out test split.",,
+"Shakibania et al. [27], 2024",APTOS 2019,0.896,0.93,published,Seen only as quoted by a second paper; the draft attributed these values to [49]. Verify against [27] before use.,,
+"Dinpajhouh & Seyyedsalehi [50], 2023",APTOS 2019,0.8369,0.8926,published,NOT VERIFIED: values copied from the draft; the article could not be opened.,,
+"Fallback baseline, NOT the specified model (this study): convnext_tiny, 256 px",APTOS 2019 (held-out 15% test split),0.8669201520912547,0.9095887663946755,"this build, run 20261011-222646_convnext_tiny_oversample_seed42",n = 526; one seed,0.8900018614432375,0.9289691907822736
