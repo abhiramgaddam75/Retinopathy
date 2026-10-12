@@ -64,7 +64,7 @@ train:
   early_stopping:
     monitor: selection_score
     patience: 8
-  epochs: 5
+  epochs: 20
   grad_accum: 2
   grad_clip_norm: 1.0
   loss:

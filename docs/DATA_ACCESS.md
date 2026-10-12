@@ -63,7 +63,10 @@ data/raw/idrid/
 
 The adapter searches these folders recursively and matches files by name, so the original
 sub-folders (`a. Training Set`, `1. Microaneurysms`, ...) can be copied as they are. Both label CSVs
-(train and test) can be dropped in as `labels_train.csv` and `labels_test.csv`. Folder and column
+(train and test) can be dropped in as `labels_train.csv` and `labels_test.csv`. The two sets reuse
+the names `IDRiD_001` ..., so keep their images in the original `a. Training Set` and
+`b. Testing Set` folders: a CSV named for a set is matched to that set's folder and its ids become
+`train_IDRiD_001` and `test_IDRiD_001`. Folder and column
 names are configurable under `data.idrid` in the config. If a column or file name differs,
 `prepare-data` stops and says which; do not rename things by guesswork, tell the Engineer.
 

@@ -8,6 +8,7 @@ import pandas as pd
 
 from xaidr.config import IdridCfg
 from xaidr.data.adapters.base import (
+    IMAGE_EXTENSIONS,
     DataMissingError,
     index_files,
     read_label_csv,
@@ -24,6 +25,17 @@ log = logging.getLogger(__name__)
 SEG_PREFIX = "seg_"
 
 
+def _set_tag(parts: tuple[str, ...]) -> str | None:
+    """'train' or 'test' when a folder or file name says which IDRiD set it belongs to."""
+    for part in parts:
+        low = part.lower()
+        if "train" in low:
+            return "train"
+        if "test" in low:
+            return "test"
+    return None
+
+
 class IdridAdapter:
     name = "idrid"
 
@@ -33,6 +45,9 @@ class IdridAdapter:
         self.overlap: pd.DataFrame = pd.DataFrame(columns=["seg_image_id", "grading_image_id"])
 
     def _grading_rows(self, raw_dir: Path) -> pd.DataFrame:
+        """Grading rows. The training and testing sets both start at IDRiD_001, so a label CSV
+        named for a set ("train"/"test") is matched only to the images in that set's folder and
+        its ids get the set as a prefix (``train_IDRiD_001``)."""
         cfg = self.cfg
         image_dir = require_dir(raw_dir / cfg.grading_images, "IDRiD grading image folder")
         label_files = sorted(raw_dir.glob(cfg.grading_labels))
@@ -40,26 +55,49 @@ class IdridAdapter:
             raise DataMissingError(
                 f"no IDRiD grading label CSV matches {raw_dir / cfg.grading_labels} (see docs/DATA_ACCESS.md)"
             )
+        by_set: dict[str, dict[str, Path]] = {}
+        for path in sorted(image_dir.rglob("*")):
+            if path.is_file() and path.suffix.lower() in IMAGE_EXTENSIONS:
+                tag = _set_tag(path.relative_to(image_dir).parent.parts) or ""
+                files = by_set.setdefault(tag, {})
+                if path.stem.lower() in files:
+                    raise DataMissingError(
+                        f"two files share the stem '{path.stem}': {files[path.stem.lower()]} and {path}"
+                    )
+                files[path.stem.lower()] = path
         frames = []
         for path in label_files:
             frame = read_label_csv(path)
             require_columns(frame, [cfg.id_column, cfg.grade_column], path)
-            frames.append(frame[[cfg.id_column, cfg.grade_column]])
+            frame = frame[[cfg.id_column, cfg.grade_column]]
+            frame = frame[frame[cfg.id_column].str.strip() != ""].copy()
+            frame["set"] = _set_tag((path.stem,)) or ""
+            frames.append(frame)
         labels = pd.concat(frames, ignore_index=True)
-        labels = labels[labels[cfg.id_column].str.strip() != ""]
-        ids = labels[cfg.id_column].str.strip().map(lambda name: Path(name).stem)
-        grade = labels[cfg.grade_column].astype(int)
-        images = index_files(image_dir)
-        missing = [i for i in ids if i.lower() not in images]
+        stems = labels[cfg.id_column].str.strip().map(lambda name: Path(name).stem)
+        sources: list[str] = []
+        missing: list[str] = []
+        for tag, stem in zip(labels["set"], stems, strict=True):
+            found = by_set.get(tag, {}).get(stem.lower())
+            if found is None and tag:  # images not in a set folder: fall back to the flat folder
+                found = by_set.get("", {}).get(stem.lower())
+            if found is None:
+                missing.append(f"{tag}/{stem}" if tag else stem)
+            else:
+                sources.append(found.as_posix())
         if missing:
             raise DataMissingError(
                 f"{len(missing)} IDRiD grading image(s) named in the labels are missing, e.g. {missing[:3]}"
             )
+        ids = [f"{tag}_{stem}" if tag else stem for tag, stem in zip(labels["set"], stems, strict=True)]
+        if len(set(ids)) != len(ids):
+            raise DataMissingError("IDRiD grading labels repeat an image id; check the label CSVs")
+        grade = labels[cfg.grade_column].astype(int)
         return pd.DataFrame(
             {
                 "dataset": self.name,
-                "image_id": ids.to_numpy(),
-                "source_path": [images[i.lower()].as_posix() for i in ids],
+                "image_id": ids,
+                "source_path": sources,
                 "grade": grade.to_numpy(),
                 "dr_label": (grade >= self.positive_min_grade).astype(int).to_numpy(),
                 "label_space": "icdr5",

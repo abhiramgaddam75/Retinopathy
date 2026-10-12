@@ -100,3 +100,14 @@ Each fix is for the Tester to re-test and close. Where a fix departs from DESIGN
 | DEF-005 | Unreadable images and impossible splits end with a one-line error and exit code 1. `make-splits` also refuses a split in which a grade would be missing from train, val or test (found while fixing: a grade with two images was silently absent from val and test). New `SplitError`; `SplitLockError` is a subclass. | No |
 | DEF-006 | `train.deterministic` removed; the top-level `deterministic` is the only key. | Yes: Section 9.1 lists both |
 | Tester file | `tests/test_sanity.py` is Tester-owned. The Engineer removed its two DEF-001 `xfail` markers and pointed its config at the test's split folder, because the suite would otherwise fail after the fixes. The Tester should review that edit. | n/a |
+
+## IDRiD on disk, 2026-10-12
+
+| Topic | Decision or fact | Reason |
+|---|---|---|
+| `idrid.py` grading ids | A label CSV whose name contains "train" or "test" is matched only to images under a folder named for the same set, and its ids get the set as a prefix (`train_IDRiD_001`, `test_IDRiD_001`). A CSV without a set name keeps the bare id and a flat image folder still works. | In the download the training set (413) and the testing set (103) both start at `IDRiD_001`; the adapter stopped with "two files share the stem". |
+| IDRiD measured | Grading: 516 images, grades 0-4: 168 / 25 / 168 / 93 / 62. Segmentation: 81 images; masks MA 81, HE 80, EX 81, SE 40, OD 81. 3 segmentation images are byte-identical to a grading image and inherit its grade. | Matches the published dataset. |
+| Preprocessing | IDRiD is preprocessed at 256 px only (`data/manifests_256`), for the model of record. | Local-only decision; the 512 px model is not trained. |
+| `make-splits` after `prepare-data` | Needed to mark newly prepared external rows `external_idrid`; the APTOS split file and its lock hash were unchanged. | The handoff plan omitted this step. |
+| External test | Run once with the frozen APTOS threshold (0.7896); no threshold or other setting was tuned on IDRiD. Detection specificity on IDRiD is 0.506. | IDRiD is test-only. |
+| Table 5 | 81 images, three explainers, target "disease", 3 h 52 min of CPU. SE rows and the SHAP and LIME rows for EX are not above chance after Holm adjustment. Attention is not computed (ConvNeXt). | `results/table5_xai_fidelity.csv`. |

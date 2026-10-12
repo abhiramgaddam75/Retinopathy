@@ -1,6 +1,6 @@
 # DR-XAI: project state and handoff
 
-**Written:** 12 October 2026, end of the first working session.
+**Written:** 12 October 2026, end of the first working session. **Updated:** late on 12 October, after the IDRiD work (Sections 4, 6, 9, 10, 12).
 **Purpose:** everything a new chat session needs to continue without the earlier conversation.
 **Project folder:** `C:\Users\abhir\Downloads\MJ\github\Retinopathy`
 **Deadlines:** panel demonstration on the morning of 13 October 2026; code submission 14 October 2026.
@@ -40,7 +40,7 @@ Two deliverables exist side by side:
 | 12 Oct | **Model of record: ConvNeXt-Tiny at 256 px** (`configs/cpu_fallback.yaml`). The model in the original design (MaxViT-Tiny, 512 px) needs about 3.5 days on this laptop and is not trained. |
 | 12 Oct | **The panel demo is a web app**, not notebooks. Accuracy is secondary to having a working demonstration. Plan: `docs/DEMO_APP_BRIEF.md`. |
 | 12 Oct | The oversampling ablation uses **5-epoch** runs for both arms (to save time). |
-| 12 Oct | IDRiD work **waits for the user's go-ahead** (see Section 7). |
+| 12 Oct | IDRiD work: the user gave the go-ahead on 12 October; the external test and Table 5 are done (Section 6). |
 
 ## 3. Machine and environment
 
@@ -59,7 +59,7 @@ Two deliverables exist side by side:
 | Dataset | State |
 |---|---|
 | **APTOS 2019** | In `data\raw\aptos2019` (3,662 labelled images; grades 0-4: 1,805 / 370 / 999 / 193 / 295). Preprocessed at 512 px (`data\processed\dr512`) and 256 px (`data\processed\dr256`). |
-| **IDRiD** | **Not extracted.** The zips are in Downloads: `A. Segmentation.zip` (81 images with lesion masks: MA 81, HE 80, EX 81, SE 40, OD 81) and `B. Disease Grading.zip` (516 graded images, two label CSVs). |
+| **IDRiD** | In `data\raw\idrid` (extracted from `A. Segmentation.zip` and `B. Disease Grading.zip` in Downloads). Grading: 516 images, grades 0-4: 168 / 25 / 168 / 93 / 62, ids `train_IDRiD_001` ... and `test_IDRiD_001` ... . Segmentation: 81 images with lesion masks (MA 81, HE 80, EX 81, SE 40, OD 81), ids `seg_IDRiD_xx`; 3 are byte-identical to a grading image. Preprocessed at 256 px only (`data\processed\dr256\idrid`, manifest `data\manifests_256\manifest.csv`); all 597 rows are `external_idrid`. |
 | **Messidor-2** | Not available (needs a registration at adcis.net). |
 
 Duplicates in APTOS (measured): 123 groups of byte-identical images (251 images). 96 extra copies of
@@ -107,7 +107,40 @@ at 256 px on the CPU (IQR 92-107 ms, 4 threads). No GPU figures.
 `results\figures\` (confusion matrix, training curves, class distribution, ablation plot, 12
 saliency panels), `results\tables_tex\`, notebooks `00`-`05` (executed).
 
-**Do not exist:** `table5_xai_fidelity.csv` and `crossdataset_summary.csv` (both need IDRiD).
+**External test on IDRiD** (`results\crossdataset_summary.csv`, n = 516, threshold frozen at 0.7896):
+
+| Task | Metric | Value | 95% CI |
+|---|---|---|---|
+| Detection | Accuracy | 0.818 | 0.789 - 0.845 |
+| Detection | Sensitivity | 0.968 | 0.948 - 0.986 |
+| Detection | Specificity | **0.506** | 0.429 - 0.583 |
+| Detection | AUC | 0.916 | 0.889 - 0.939 |
+| Grading | Accuracy | 0.479 | 0.438 - 0.517 |
+| Grading | Macro sensitivity | 0.487 | 0.441 - 0.530 |
+| Grading | Macro AUC | 0.839 | 0.817 - 0.859 |
+| Grading | QWK | 0.706 | 0.668 - 0.743 |
+
+QWK falls by 0.203 against APTOS (CI -0.249 to -0.161). About half of the healthy IDRiD eyes are
+called "DR detected" at the APTOS threshold. Messidor-2 is "not available"; explanation stability
+is "not computed" (ISSUE-013).
+
+**Table 5, lesion fidelity on IDRiD** (`results\table5_xai_fidelity.csv`, 81 images, target
+"disease", 3 h 52 min of CPU). Mean IoU of the top 10% of saliency with the lesion mask:
+
+| Lesion | n | Chance | Maximum | Grad-CAM++ | SHAP | LIME |
+|---|---|---|---|---|---|---|
+| Any | 81 | 0.020 | 0.258 | 0.042 | 0.033 | 0.036 |
+| HE | 80 | 0.010 | 0.112 | 0.020 | 0.021 | 0.020 |
+| EX | 81 | 0.009 | 0.119 | 0.019 | 0.010 (n.s.) | 0.013 (n.s.) |
+| SE | 40 | 0.005 | 0.050 | 0.011 (n.s.) | 0.008 (n.s.) | 0.011 (n.s.) |
+| MA | 81 | 0.0014 | 0.014 | 0.0025 | 0.0022 | 0.0020 |
+
+"n.s.": Holm-adjusted p above 0.05 (0.086 to 0.23); every other cell has adjusted p at most 0.004.
+Lesion recall at 10% for "any" (chance 0.10): Grad-CAM++ 0.275, SHAP 0.203, LIME 0.199. Pointing
+accuracy for "any" (chance 0.029): Grad-CAM++ 0.025, SHAP 0.025, LIME 0.123. Median seconds per
+map: Grad-CAM++ 0.33, SHAP 67, LIME 84. The maps are associated with lesions (about twice chance)
+but do not localise them well; the paper must not claim more. Maps are cached in the run folder
+under `saliency\`.
 
 ## 7. Demo web app (built and working)
 
@@ -150,7 +183,7 @@ src\xaidr\
   viz\figures.py  confusion matrix, training curves, class distribution, saliency panels
 app\demo_app.py   the web app
 tools\            make_demo_samples, make_notebooks, make_colab_bundle, make_colab_notebook
-tests\            128 tests; `-m "not slow"` runs 126
+tests\            129 tests; `-m "not slow"` runs 127
 notebooks\        00-05, generated by tools\make_notebooks.py --execute
 docs\             DESIGN, DECISIONS_LOG, VERIFICATION, DATA_ACCESS, TEST_REPORT, DEFECTS,
                   ISSUE_LOG, SCIENTIFIC_REVIEW, DEMO_APP_BRIEF, DEMO_GUIDE, TRAINING_ON_GPU, HANDOFF
@@ -170,8 +203,7 @@ APTOS is 5-6 minutes; a SHAP or LIME map is 1-2 minutes; the full test suite is 
 
 ## 9. Test and quality status
 
-- Last full run (`-m "not slow"`): **126 passed, 0 failed**, after the demo app was added.
-  The two slow end-to-end tests passed on the previous commit and were not rerun since.
+- Last full run (all 129 tests, slow ones included): **all passed**, after the IDRiD adapter fix.
 - `ruff check src tests tools app` and `mypy src --ignore-missing-imports`: clean.
 - Tester found defects DEF-001 to DEF-008; DEF-001 to DEF-006 are fixed in code. Researcher issues
   ISSUE-013 to ISSUE-016 are addressed in code. **All are still marked OPEN** in `docs\DEFECTS.md`
@@ -185,18 +217,15 @@ APTOS is 5-6 minutes; a SHAP or LIME map is 1-2 minutes; the full test suite is 
 1. **User:** double-click `run_demo.bat`, try the samples and one upload, once with Wi-Fi off.
    Read `docs\DEMO_GUIDE.md`.
 
-### IDRiD (waiting for the user's go-ahead; plan already agreed in outline)
-2. **Fix the IDRiD adapter first.** In `B. Disease Grading.zip` the training set (413 images) and
-   the testing set (103 images) both start at `IDRiD_001`, so file names collide and the current
-   adapter stops with "two files share the stem". Give the two sets separate ids (for example
-   `train_IDRiD_001`, `test_IDRiD_001`) and match each label CSV to its own folder. Add a test.
-3. Extract both zips into `data\raw\idrid\` (layout in `docs\DATA_ACCESS.md`), then
-   `prepare-data --config configs\cpu_fallback.yaml --datasets idrid`.
-4. `crossdataset --run <model of record>`: external test on 516 images, about 5 minutes.
-5. `xai --run <model of record>`: Table 5 on the 81 annotated images with Grad-CAM++, SHAP, LIME.
-   **Estimated 3-5 hours of CPU**; maps are cached, so it can be resumed. `--limit 10` gives a
-   first look in about 30 minutes. Microaneurysm rows will be weak at 256 px by construction.
-6. Re-run `figures --gallery 1` and `tools\make_notebooks.py --execute`; commit.
+### IDRiD (done on 12 October)
+2. Done: the adapter gives the training and testing grading sets separate ids (`train_IDRiD_001`,
+   `test_IDRiD_001`) and matches each label CSV to its own folder; test added.
+3. Done: both zips extracted, `prepare-data --datasets idrid`, then `make-splits` (needed to mark
+   the IDRiD rows `external_idrid`; the APTOS lock was unchanged).
+4. Done: `crossdataset` (Section 6).
+5. Done: `xai`, Table 5 (Section 6). On battery the CPU is throttled to about a third of the
+   speed; keep the charger in.
+6. Done: `figures --gallery 1` and `tools\make_notebooks.py --execute`; committed.
 
 ### Still open for the submission
 7. **Push to GitHub.** Every commit is local only; GitHub shows just the initial commit.
@@ -240,7 +269,8 @@ Branch `main`, all work committed locally, working tree clean at the time of wri
 commits, newest first:
 
 ```
-(this file)  Handoff notes
+(this commit)  IDRiD: adapter fix, external test, Table 5, figures and notebooks
+67c1628  Handoff notes
 09c14bd  Demo app: fix the page-title assertion; stop tracking the local preview config
 2c87921  Demo web app: upload a fundus photo, get detection, grade and a saliency map
 228cd5e  Ablation and efficiency results for the CPU fallback model; notebooks re-executed

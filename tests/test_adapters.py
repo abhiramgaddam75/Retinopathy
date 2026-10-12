@@ -73,6 +73,32 @@ def test_idrid_reports_unexpected_columns(idrid_raw: Path) -> None:
         IdridAdapter().build_manifest(idrid_raw)
 
 
+def test_idrid_train_and_test_sets_share_file_names(tmp_path: Path) -> None:
+    """The real download numbers the training and testing sets from IDRiD_001 each."""
+    from conftest import fundus, write_image
+
+    raw = tmp_path / "idrid"
+    sets = {"a. Training Set": ("labels_train.csv", {"IDRiD_001": 3, "IDRiD_002": 0}),
+            "b. Testing Set": ("labels_test.csv", {"IDRiD_001": 4, "IDRiD_002": 1})}
+    for n, (folder, (csv, grades)) in enumerate(sets.items()):
+        for i, name in enumerate(grades):
+            write_image(raw / "grading" / "images" / folder / f"{name}.jpg", fundus(10 * n + i))
+        pd.DataFrame({"Image name": list(grades), "Retinopathy grade": list(grades.values())}).to_csv(
+            raw / "grading" / csv, index=False)
+    seg = raw / "segmentation"
+    write_image(seg / "images" / "IDRiD_01.jpg", fundus(99))
+    write_image(seg / "masks" / "MA" / "IDRiD_01_MA.tif", fundus(98)[:, :, 0])
+
+    df = IdridAdapter().build_manifest(raw)
+    grading = df[~df["has_masks"]].set_index("image_id")
+    assert grading["grade"].to_dict() == {
+        "train_IDRiD_001": 3, "train_IDRiD_002": 0, "test_IDRiD_001": 4, "test_IDRiD_002": 1,
+    }
+    # each id points at the image of its own set
+    assert all("Training" in grading.loc[i, "source_path"] for i in grading.index if i.startswith("train_"))
+    assert all("Testing" in grading.loc[i, "source_path"] for i in grading.index if i.startswith("test_"))
+
+
 def test_messidor_manifest(messidor_raw: Path) -> None:
     adapter = Messidor2Adapter(MESSIDOR_CFG)
     df = normalise(adapter.build_manifest(messidor_raw))
