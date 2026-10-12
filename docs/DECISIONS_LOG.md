@@ -24,6 +24,10 @@ Changes to DESIGN.md Section 5, and implementation choices the design left open.
 | 2026-10-10 | `dataset.py` | A missing label is returned as `-1`. | Messidor-2 rows may have no five-class grade (Section 8.3). |
 | 2026-10-10 | `cli.py` | `prepare-data` fails when a configured dataset folder is missing; `--datasets` selects a subset. | "If a dataset file is missing, stop and ask" (Section 0). |
 
+## Team decision, 2026-10-12: local only
+
+The team decided not to use Colab or another GPU. The model of record is therefore the CPU fallback (`convnext_tiny`, 256 px, `configs/cpu_fallback.yaml`), which departs from D1 and the 512 px input. Attention saliency cannot be reported for this backbone (F6), leaving three explainers. The specified model remains untrained. The 5-epoch ablation arms were also the team's choice (to save time); they are compared with each other, not with the 20-epoch run.
+
 ## Milestones M2 and M3 code, 2026-10-12
 
 Written and tested on synthetic data and untrained or fallback models. **No fidelity or
@@ -39,6 +43,8 @@ cross-dataset number exists**: IDRiD and Messidor-2 are not available.
 | `eval/xai_fidelity.py` | Saliency maps cached as float32 in the run folder. Table 5 adds lesion recall, maximum attainable IoU and Dice, a one-sided Wilcoxon test of IoU against chance and Holm-adjusted p-values over the primary-k rows. `fidelity_summary.json` records images per lesion, images predicted grade 0 and seconds per image. | DESIGN 7.23 plus ISSUE-014. |
 | `eval/crossdataset.py` | One long table; datasets missing from the manifest are written as "not available". QWK difference uses independent bootstrap resampling of the two test sets. Explanation stability is written as "not computed". IDRiD segmentation images are excluded from grading metrics (they repeat grading images). | DESIGN 7.23; ISSUE-013. |
 | `eval/efficiency.py` | CPU fp32 always; GPU fp32 and fp16 when a GPU exists. No quantised or pruned variant. | DESIGN 7.23; the compressed variant is a SHOULD item not done, so the paper must not promise it. |
+| `cli.py` | `all` runs every step on the datasets present under `data/raw`, skips the xai step when no lesion masks exist, and with `--run` reuses a trained run. | DESIGN 7.25; lets the pipeline finish honestly while IDRiD and Messidor-2 are missing. |
+| `tools/make_notebooks.py` | The six notebooks are generated from one script and executed with `--execute`; each reports missing inputs instead of failing. Notebook 00 uses `torchinfo`. | DESIGN 12. |
 | `viz/figures.py` | Class-distribution bars use a linear axis from zero with counts labelled, not a log axis. | DESIGN 7.24 asked for log scale; bar length on a log axis is not meaningful. |
 
 ## Milestone M1 and the first real data, 2026-10-11

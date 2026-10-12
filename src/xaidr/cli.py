@@ -20,10 +20,6 @@ from xaidr.seed import set_seed
 log = logging.getLogger("xaidr")
 
 MANIFEST_NAME = "manifest.csv"
-# Steps that land in later milestones (DESIGN.md Section 15.1).
-PENDING_STEPS = {
-    "all": "M4",
-}
 
 
 def manifest_path(cfg: Config) -> Path:
@@ -78,6 +74,48 @@ def run_make_splits(cfg: Config, resplit: bool) -> None:
     log.info("split counts:\n%s", manifest.groupby(["dataset", "split"]).size())
 
 
+def run_all(args: argparse.Namespace, cfg: Config) -> int:
+    """prepare -> split -> train -> evaluate -> crossdataset -> xai -> efficiency -> figures.
+
+    Datasets without a folder under ``data/raw`` are skipped with a warning, and the steps that
+    need them write "not available" or are skipped; nothing is invented for missing data.
+    """
+    common = ["--config", args.config]
+    present = [name for name in cfg.data.datasets if (cfg.paths.raw / name).is_dir()]
+    absent = [name for name in cfg.data.datasets if name not in present]
+    if absent:
+        log.warning("datasets not on disk, skipped: %s", absent)
+    if "aptos2019" not in present:
+        raise DataMissingError(f"APTOS 2019 is required under {cfg.paths.raw / 'aptos2019'}")
+    steps: list[list[str]] = [
+        ["prepare-data", *common, "--datasets", ",".join(present)],
+        ["make-splits", *common],
+    ]
+    for step in steps:
+        code = main([*step, *args.overrides])
+        if code != 0:
+            return code
+    run_id = args.run
+    if not run_id:
+        checkpoints = cfg.paths.checkpoints
+        before = {p.name for p in checkpoints.iterdir()} if checkpoints.is_dir() else set()
+        code = main(["train", *common, *args.overrides])
+        if code != 0:
+            return code
+        (run_id,) = sorted({p.name for p in checkpoints.iterdir() if p.is_dir()} - before)
+    later = ["evaluate", "crossdataset", "efficiency", "figures"]
+    if read_manifest(manifest_path(cfg))["has_masks"].any():
+        later.insert(2, "xai")
+    else:
+        log.warning("no lesion masks in the manifest: the xai step (Table 5) is skipped")
+    for step_name in later:
+        code = main([step_name, *common, "--run", run_id, *args.overrides])
+        if code != 0:
+            return code
+    log.info("all steps finished for run %s", run_id)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="xaidr", description="DR-XAI pipeline")
     sub = parser.add_subparsers(dest="step", required=True)
@@ -110,9 +148,11 @@ def build_parser() -> argparse.ArgumentParser:
         p.add_argument("--run", required=True, help="run id under checkpoints/")
         if name == "xai":
             p.add_argument("--limit", type=int, help="only the first N lesion-annotated images")
-    for name, milestone in PENDING_STEPS.items():
-        p = add(name, f"(milestone {milestone})")
-        p.add_argument("--run", help="run id under checkpoints/")
+        if name == "figures":
+            p.add_argument("--gallery", type=int, default=0, metavar="N",
+                           help="also write saliency panels for N test images per DR grade")
+    p = add("all", "every step in order, on the datasets present under data/raw")
+    p.add_argument("--run", help="reuse this trained run instead of training a new one")
     return parser
 
 
@@ -169,7 +209,12 @@ def main(argv: list[str] | None = None) -> int:
 
                 manifest = read_manifest(manifest_path(run_cfg))
                 label = method_label(run_cfg)
-                for path in write_run_figures(run_dir, manifest, run_cfg.paths.results, label):
+                paths = write_run_figures(run_dir, manifest, run_cfg.paths.results, label)
+                if args.gallery:
+                    from xaidr.viz.figures import write_saliency_gallery
+
+                    paths += write_saliency_gallery(run_cfg, run_dir, manifest, args.gallery)
+                for path in paths:
                     log.info("wrote %s", path)
         elif args.step == "ablation":
             from xaidr.eval.ablation import write_ablation
@@ -184,9 +229,8 @@ def main(argv: list[str] | None = None) -> int:
                     run_cfg = load_config(run_dir / CONFIG_SNAPSHOT, args.overrides)
                     predict_test_split(run_cfg, run_dir, manifest_path(run_cfg))
             write_ablation(run_dirs[0], run_dirs[1], cfg.paths.results, cfg.eval.bootstrap_iterations)
-        else:
-            log.error("step '%s' is not implemented yet (milestone %s)", args.step, PENDING_STEPS[args.step])
-            return 2
+        elif args.step == "all":
+            return run_all(args, cfg)
     except (ConfigError, DataMissingError, ManifestError, PreprocessError, SplitError, AblationError) as exc:
         log.error("%s", exc)
         return 1

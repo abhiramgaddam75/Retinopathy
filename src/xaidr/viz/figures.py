@@ -12,6 +12,8 @@ from pathlib import Path
 
 import matplotlib
 
+from xaidr.config import Config
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
@@ -184,3 +186,55 @@ def write_run_figures(
         written.append(save(curves, out / f"training_curves_{run_dir.name}.png"))
     written.append(save(class_distribution_fig(manifest_df), out / "class_distribution.png"))
     return written
+
+
+def write_saliency_gallery(
+    cfg: Config, run_dir: Path, manifest_df: pd.DataFrame, per_grade: int = 1, split: str = "test"
+) -> list[Path]:
+    """Qualitative panels for a few images of each DR grade, one file per image and method.
+
+    When an image has lesion masks their union is outlined; APTOS images have none, so these
+    panels illustrate the maps and are not evidence of their correctness.
+    """
+    import torch
+
+    from xaidr.data.augment import eval_transform
+    from xaidr.data.preprocess import preprocess_record, read_image
+    from xaidr.training.run import load_best_model
+    from xaidr.xai import build_explainer
+    from xaidr.xai.attention import AttentionUnavailableError
+    from xaidr.xai.base import denormalise
+    from xaidr.xai.fidelity import FIDELITY_LESIONS
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = load_best_model(run_dir, cfg, device)
+    rows = manifest_df[(manifest_df["split"] == split) & manifest_df["grade"].notna()]
+    chosen = rows[rows["grade"] >= 1].sort_values("image_id").groupby("grade").head(per_grade)
+    transform = eval_transform(cfg.data.image_size)
+    written = []
+    for name in cfg.xai.methods:
+        try:
+            explainer = build_explainer(name, model, cfg.xai, cfg.seed)
+        except AttentionUnavailableError:
+            continue
+        for _, row in chosen.iterrows():
+            rgb = read_image(row["processed_path"])[..., ::-1].copy()
+            tensor = transform(image=rgb)["image"]
+            with torch.no_grad():
+                predicted = int(model(tensor[None].to(device))["grade_logits"].argmax(dim=1))
+            saliency = explainer.explain(tensor, cfg.xai.target if cfg.xai.target == "disease" else predicted)
+            mask = None
+            if row["has_masks"]:
+                masks = preprocess_record(row.to_dict(), cfg.data.image_size)[1]
+                lesions = [masks[k] for k in FIDELITY_LESIONS if k in masks]
+                mask = np.logical_or.reduce(lesions) if lesions else None
+            title = (f"{name}: {row['dataset']} {row['image_id']}, true grade {int(row['grade'])}, "
+                     f"predicted {predicted}, target {cfg.xai.target}")
+            fig = saliency_panel(denormalise(tensor), saliency, mask, title)
+            target = results_figures(cfg) / f"saliency_{name}_{row['image_id']}_{run_dir.name}.png"
+            written.append(save(fig, target))
+    return written
+
+
+def results_figures(cfg: Config) -> Path:
+    return cfg.paths.results / "figures"

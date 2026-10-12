@@ -102,3 +102,18 @@ def test_crossdataset_efficiency_figures(aptos_raw: Path, idrid_raw: Path, tmp_p
                "xai.methods=[gradcam_pp]") == 0
     table5 = pd.read_csv(tmp_path / "results" / "table5_xai_fidelity.csv")
     assert set(table5["method"]) == {"gradcam_pp"} and (table5["n_images"] == 1).all()
+
+
+@pytest.mark.slow
+def test_all_step(aptos_raw: Path, idrid_raw: Path, tmp_path: Path) -> None:
+    """`all` runs every step on the datasets that are present (Messidor-2 is not)."""
+    assert run(tmp_path, "all", "train.epochs=1", "xai.methods=[gradcam_pp]") == 0
+    results = tmp_path / "results"
+    for name in ("table4_detection_grading_aptos_test.csv", "table5_xai_fidelity.csv",
+                 "table6_comparative.csv", "crossdataset_summary.csv", "efficiency.csv"):
+        assert (results / name).is_file(), name
+    assert len(list((results / "figures").glob("*.png"))) == 3
+    (run_dir,) = (p for p in (tmp_path / "checkpoints").iterdir() if p.is_dir())
+    # a second call reuses the trained run instead of training again
+    assert run(tmp_path, "all", "--run", run_dir.name, "xai.methods=[gradcam_pp]") == 0
+    assert len([p for p in (tmp_path / "checkpoints").iterdir() if p.is_dir()]) == 1

@@ -42,8 +42,8 @@ def test_prepare_and_split(aptos_raw: Path, idrid_raw: Path, tmp_path: Path) -> 
     assert (tmp_path / "results" / "env" / "pip_freeze.txt").is_file()
 
 
-def test_later_steps_report_their_milestone(tmp_path: Path) -> None:
-    assert run(tmp_path, "all") == 2
+def test_all_needs_aptos(tmp_path: Path) -> None:
+    assert run(tmp_path, "all") == 1  # no data under raw/: a readable error, not a crash
 
 
 def test_unreadable_image_and_changed_parameters_are_reported(aptos_raw: Path, tmp_path: Path) -> None:

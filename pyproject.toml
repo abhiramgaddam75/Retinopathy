@@ -24,3 +24,7 @@ src = ["src", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+# notebook cell sources are kept as written in the notebook
+"tools/make_notebooks.py" = ["E501"]
