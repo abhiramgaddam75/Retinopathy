@@ -12,8 +12,8 @@ by milestone (Section 15.1).
 |---|---|---|
 | M0 | Scaffold, config, manifest, adapters, preprocessing, splits, data-layer tests | done, tests pass on synthetic data |
 | M1 | Model, loss, trainer, training run, Table 4 / Table 6 | code done and tested; APTOS 2019 prepared and split. The specified model has **not** been trained (no GPU, see [docs/TRAINING_ON_GPU.md](docs/TRAINING_ON_GPU.md)); only a reduced CPU fallback run exists |
-| M2 | Four explainers, fidelity on IDRiD (Table 5), cross-dataset evaluation | fidelity and agreement metrics written and tested on hand-made maps; explainers and evaluation not started: need a trained model, IDRiD, Messidor-2 |
-| M3 | Ablation, efficiency, figures, notebooks | not started |
+| M2 | Four explainers, fidelity on IDRiD (Table 5), cross-dataset evaluation | code done and tested on synthetic data; **no numbers**: needs IDRiD, Messidor-2 and (for attention saliency) the MaxViT model |
+| M3 | Ablation, efficiency, figures, notebooks | ablation, efficiency and figures steps done; figures exist for the CPU fallback run; notebooks not started |
 | M4 | `make reproduce`, release tag | not started |
 
 **No results exist yet.** `results/` holds no metric until a run has produced it.

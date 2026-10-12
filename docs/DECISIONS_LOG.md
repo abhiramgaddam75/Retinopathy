@@ -24,6 +24,23 @@ Changes to DESIGN.md Section 5, and implementation choices the design left open.
 | 2026-10-10 | `dataset.py` | A missing label is returned as `-1`. | Messidor-2 rows may have no five-class grade (Section 8.3). |
 | 2026-10-10 | `cli.py` | `prepare-data` fails when a configured dataset folder is missing; `--datasets` selects a subset. | "If a dataset file is missing, stop and ask" (Section 0). |
 
+## Milestones M2 and M3 code, 2026-10-12
+
+Written and tested on synthetic data and untrained or fallback models. **No fidelity or
+cross-dataset number exists**: IDRiD and Messidor-2 are not available.
+
+| Module | Choice | Reason / departure |
+|---|---|---|
+| `xai/base.py` | Explainers take the normalised image tensor and a target: `"disease"` (log-odds of any DR, the default) or a grade. SHAP and LIME perturb the de-normalised uint8 image and read P(target). | ISSUE-014; replaces D11. |
+| `xai/gradcam_pp.py` | Own implementation of the first-order closed form on the backbone's final feature map; a test checks it against `pytorch_grad_cam.GradCAMPlusPlus` (correlation > 0.99 on ConvNeXt). | DESIGN 7.17 allows either. No hooks or reshape transform are needed because the model exposes its feature map. Resolves V4. |
+| `xai/shap_explainer.py` | `shap.PartitionExplainer` with `shap.maskers.Image("inpaint_telea")`, 512 evaluations. The partition is the explainer's own hierarchy, about 16 x 16 regions at that budget, not a fixed grid. | DESIGN 7.18 allows partition or kernel. The paper must say "partition explainer with an inpainting masker", not "kernel explainer" (F4). Resolves V6: runs with opencv-python-headless 5.0. |
+| `xai/lime_explainer.py` | Quickshift (kernel 4, max distance 200, ratio 0.2), 1,000 samples, hidden colour 0, two-class output (not DR, DR). | DESIGN 7.19; the settings must be reported in the paper (review B3 item 3). |
+| `xai/attention.py` | Attention each position receives in MaxViT's last grid-attention block, averaged over 16 heads and all queries; the fused path is switched off for one pass and restored. At 512 px that block is one global window over the 16 x 16 map. It ignores the target. | Resolves V8 within the one-day box. Unavailable on ConvNeXt: reported as "not computed", never silently skipped. |
+| `eval/xai_fidelity.py` | Saliency maps cached as float32 in the run folder. Table 5 adds lesion recall, maximum attainable IoU and Dice, a one-sided Wilcoxon test of IoU against chance and Holm-adjusted p-values over the primary-k rows. `fidelity_summary.json` records images per lesion, images predicted grade 0 and seconds per image. | DESIGN 7.23 plus ISSUE-014. |
+| `eval/crossdataset.py` | One long table; datasets missing from the manifest are written as "not available". QWK difference uses independent bootstrap resampling of the two test sets. Explanation stability is written as "not computed". IDRiD segmentation images are excluded from grading metrics (they repeat grading images). | DESIGN 7.23; ISSUE-013. |
+| `eval/efficiency.py` | CPU fp32 always; GPU fp32 and fp16 when a GPU exists. No quantised or pruned variant. | DESIGN 7.23; the compressed variant is a SHOULD item not done, so the paper must not promise it. |
+| `viz/figures.py` | Class-distribution bars use a linear axis from zero with counts labelled, not a log axis. | DESIGN 7.24 asked for log scale; bar length on a log axis is not meaningful. |
+
 ## Milestone M1 and the first real data, 2026-10-11
 
 | Topic | Decision or fact | Reason |

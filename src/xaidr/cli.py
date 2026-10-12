@@ -22,7 +22,7 @@ log = logging.getLogger("xaidr")
 MANIFEST_NAME = "manifest.csv"
 # Steps that land in later milestones (DESIGN.md Section 15.1).
 PENDING_STEPS = {
-    "crossdataset": "M2", "all": "M4",
+    "all": "M4",
 }
 
 
@@ -102,6 +102,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--against", required=True, help="run id trained with minority.mode=none")
     for name, text in (
         ("xai", "explanation fidelity against lesion masks (Table 5)"),
+        ("crossdataset", "in-domain versus external test sets (Section 6.3)"),
         ("efficiency", "parameters, size, latency and memory of a run"),
         ("figures", "confusion matrix, training curves and class distribution"),
     ):
@@ -143,7 +144,7 @@ def main(argv: list[str] | None = None) -> int:
             # evaluate with the config the run was trained with, not the current default
             run_cfg = load_config(run_dir / CONFIG_SNAPSHOT, args.overrides)
             evaluate_run(run_cfg, run_dir, manifest_path(run_cfg))
-        elif args.step in ("xai", "efficiency", "figures"):
+        elif args.step in ("xai", "crossdataset", "efficiency", "figures"):
             from xaidr.training.run import CONFIG_SNAPSHOT
 
             run_dir = cfg.paths.checkpoints / args.run
@@ -154,6 +155,10 @@ def main(argv: list[str] | None = None) -> int:
                 from xaidr.eval.xai_fidelity import run_fidelity
 
                 run_fidelity(run_cfg, run_dir, manifest_path(run_cfg), args.limit)
+            elif args.step == "crossdataset":
+                from xaidr.eval.crossdataset import cross_dataset
+
+                cross_dataset(run_cfg, run_dir, manifest_path(run_cfg))
             elif args.step == "efficiency":
                 from xaidr.eval.efficiency import benchmark_run
 

@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 from conftest import REPO_ROOT
 from xaidr.cli import main
@@ -68,3 +69,36 @@ def test_prepare_split_train_evaluate(aptos_raw: Path, tmp_path: Path) -> None:
     qwk = table[table["metric"] == "qwk"].iloc[0]["value"]
     assert proposed["qwk"] == qwk and (table6["source"].iloc[:-1] == "published").all()
     assert (run_dir / "confusion_matrix_test.csv").is_file()
+
+
+def test_crossdataset_efficiency_figures(aptos_raw: Path, idrid_raw: Path, tmp_path: Path) -> None:
+    """The later steps on a one-epoch run: APTOS in-domain, IDRiD external, Messidor-2 absent."""
+    assert run(tmp_path, "prepare-data", "--datasets", "aptos2019,idrid") == 0
+    assert run(tmp_path, "make-splits") == 0
+    assert run(tmp_path, "train", "train.epochs=1") == 0
+    (run_dir,) = (tmp_path / "checkpoints").iterdir()
+    assert run(tmp_path, "evaluate", "--run", run_dir.name) == 0
+
+    assert run(tmp_path, "crossdataset", "--run", run_dir.name) == 0
+    summary = pd.read_csv(tmp_path / "results" / "crossdataset_summary.csv")
+    status = summary.groupby("dataset")["status"].first().to_dict()
+    assert status == {"aptos2019": "computed", "idrid": "computed", "messidor2": "not available"}
+    idrid = summary[summary["dataset"] == "idrid"]
+    assert (idrid["n"] == 4).all() and (idrid["split"] == "external_idrid").all()  # grading images only
+    assert set(idrid["metric"]) >= {"auc", "qwk"}
+    assert idrid["detection_definition"].iloc[0] == "any DR (grade >= 1)"
+    assert idrid.loc[idrid["metric"] == "qwk", "qwk_diff_ci_lo"].notna().all()
+    aptos = summary[summary["dataset"] == "aptos2019"]
+    table4 = pd.read_csv(tmp_path / "results" / "table4_detection_grading_aptos_test.csv")
+    assert aptos["value"].tolist() == pytest.approx(table4["value"].tolist(), nan_ok=True)
+    assert summary["explanation_stability"].str.startswith("not computed").all()
+    assert len(pd.read_csv(run_dir / "predictions_external_idrid.csv")) == 4
+
+    assert run(tmp_path, "figures", "--run", run_dir.name) == 0
+    names = sorted(p.name for p in (tmp_path / "results" / "figures").iterdir())
+    assert names == ["class_distribution.png", f"confusion_matrix_{run_dir.name}.png",
+                     f"training_curves_{run_dir.name}.png"]
+    assert run(tmp_path, "xai", "--run", run_dir.name, "--limit", "1",
+               "xai.methods=[gradcam_pp]") == 0
+    table5 = pd.read_csv(tmp_path / "results" / "table5_xai_fidelity.csv")
+    assert set(table5["method"]) == {"gradcam_pp"} and (table5["n_images"] == 1).all()
