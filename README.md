@@ -46,7 +46,8 @@ python -m xaidr.cli train   --config configs/default.yaml      # M1
 python -m xaidr.cli evaluate --run <run_id>                    # M1
 python -m xaidr.cli xai     --run <run_id>                     # M2
 python -m xaidr.cli crossdataset --run <run_id>                # M2
-python -m xaidr.cli ablation --config configs/ablation_no_oversampling.yaml   # M3
+python -m xaidr.cli train minority.mode=none                   # second arm of the ablation
+python -m xaidr.cli ablation --run <oversample run_id> --against <none run_id>
 python -m xaidr.cli efficiency --run <run_id>                  # M3
 python -m xaidr.cli figures --run <run_id>                     # M3
 ```

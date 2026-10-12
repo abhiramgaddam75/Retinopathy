@@ -13,6 +13,7 @@ from xaidr.data.adapters import DataMissingError, get_adapter
 from xaidr.data.manifest import CROP_COLUMNS, ManifestError, normalise, read_manifest, write_manifest
 from xaidr.data.preprocess import PreprocessError, build_processed
 from xaidr.data.splits import SplitError, make_splits
+from xaidr.eval.ablation import AblationError
 from xaidr.logging_utils import setup_logging, write_env
 from xaidr.seed import set_seed
 
@@ -21,7 +22,7 @@ log = logging.getLogger("xaidr")
 MANIFEST_NAME = "manifest.csv"
 # Steps that land in later milestones (DESIGN.md Section 15.1).
 PENDING_STEPS = {
-    "xai": "M2", "crossdataset": "M2", "ablation": "M3", "efficiency": "M3", "figures": "M3", "all": "M4",
+    "xai": "M2", "crossdataset": "M2", "efficiency": "M3", "figures": "M3", "all": "M4",
 }
 
 
@@ -96,6 +97,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--resume", metavar="RUN_ID", help="continue a run from its last.pt")
     p = add("evaluate", "Table 4 and Table 6 on the APTOS 2019 test split")
     p.add_argument("--run", required=True, help="run id under checkpoints/")
+    p = add("ablation", "paired comparison of an oversampling run with a no-oversampling run")
+    p.add_argument("--run", required=True, help="run id trained with minority.mode=oversample")
+    p.add_argument("--against", required=True, help="run id trained with minority.mode=none")
     for name, milestone in PENDING_STEPS.items():
         p = add(name, f"(milestone {milestone})")
         p.add_argument("--run", help="run id under checkpoints/")
@@ -130,10 +134,23 @@ def main(argv: list[str] | None = None) -> int:
             # evaluate with the config the run was trained with, not the current default
             run_cfg = load_config(run_dir / CONFIG_SNAPSHOT, args.overrides)
             evaluate_run(run_cfg, run_dir, manifest_path(run_cfg))
+        elif args.step == "ablation":
+            from xaidr.eval.ablation import write_ablation
+            from xaidr.eval.evaluate_grading import predict_test_split
+            from xaidr.training.run import CONFIG_SNAPSHOT
+
+            run_dirs = [cfg.paths.checkpoints / args.against, cfg.paths.checkpoints / args.run]
+            for run_dir in run_dirs:
+                if not (run_dir / "run.json").is_file():
+                    raise DataMissingError(f"no finished run at {run_dir}")
+                if not (run_dir / "predictions_test.csv").is_file():
+                    run_cfg = load_config(run_dir / CONFIG_SNAPSHOT, args.overrides)
+                    predict_test_split(run_cfg, run_dir, manifest_path(run_cfg))
+            write_ablation(run_dirs[0], run_dirs[1], cfg.paths.results, cfg.eval.bootstrap_iterations)
         else:
             log.error("step '%s' is not implemented yet (milestone %s)", args.step, PENDING_STEPS[args.step])
             return 2
-    except (ConfigError, DataMissingError, ManifestError, PreprocessError, SplitError) as exc:
+    except (ConfigError, DataMissingError, ManifestError, PreprocessError, SplitError, AblationError) as exc:
         log.error("%s", exc)
         return 1
     return 0

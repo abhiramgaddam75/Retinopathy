@@ -79,13 +79,19 @@ def table4_rows(predictions: pd.DataFrame, threshold: float, n_boot: int) -> pd.
     return pd.DataFrame(rows)
 
 
-def evaluate_run(cfg: Config, run_dir: Path, manifest_path: Path) -> pd.DataFrame:
+def predict_test_split(cfg: Config, run_dir: Path, manifest_path: Path) -> pd.DataFrame:
+    """Predictions of the run's best model on the APTOS test split, written to the run folder."""
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     manifest = read_manifest(manifest_path)
     loader = make_eval_loader(manifest, "test", cfg)
     model = load_best_model(run_dir, cfg, device)
     predictions = predict(model, loader, device, cfg.train.amp)
     predictions.to_csv(run_dir / "predictions_test.csv", index=False)
+    return predictions
+
+
+def evaluate_run(cfg: Config, run_dir: Path, manifest_path: Path) -> pd.DataFrame:
+    predictions = predict_test_split(cfg, run_dir, manifest_path)
     threshold = json.loads((run_dir / "threshold.json").read_text(encoding="utf-8"))["threshold"]
 
     table = table4_rows(predictions, threshold, cfg.eval.bootstrap_iterations)
