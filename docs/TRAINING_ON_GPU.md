@@ -11,6 +11,38 @@ project laptop (Intel i7-1165G7, 4 cores, no GPU) with real APTOS batches:
 These steps have **not been run by the Engineer** (no GPU was available); they follow the same CLI
 that is tested on CPU. Report anything that fails.
 
+## Google Colab (recommended: no GitHub or Kaggle account needed)
+
+Everything Colab needs is in one file, `dr_xai_colab.zip` (about 1.3 GB): the code, the 3,662
+preprocessed 512 px images, the manifest and the locked split. Build it on the laptop with
+
+```
+python tools/make_colab_bundle.py C:\Users\<you>\Downloads\dr_xai_colab.zip
+```
+
+1. Upload `dr_xai_colab.zip` to the top level of your Google Drive ("My Drive").
+2. Go to <https://colab.research.google.com>, choose **Upload**, and upload
+   `colab/DR_XAI_train_colab.ipynb` from this repository.
+3. **Runtime -> Change runtime type -> T4 GPU -> Save.**
+4. Run cells 1 and 2. Cell 1 asks for permission to read your Drive. Cell 2 must print a GPU name
+   (for example "Tesla T4"). If it raises an error instead, the GPU is not switched on (step 3).
+5. Run cell 3. It trains the specified model and prints one line per epoch. When it ends, the
+   last line is `run id: <something>`. Copy that id.
+6. Paste the id into cell 4 in place of `PASTE_RUN_ID_HERE` and run it. It scores the model once
+   on the held-out test split.
+7. In Google Drive, open `dr_xai_checkpoints`. Download the run folder and the `results_<run id>`
+   folder. Put the run folder into `checkpoints\` in the project on the laptop.
+
+If Colab disconnects during cell 3, reconnect, run cells 1 and 2 again, put the run id (the name of
+the newest folder in `My Drive/dr_xai_checkpoints`) into cell 3b, remove the `#` and run it.
+
+Cells 5 and 6 are optional further runs (no-oversampling ablation arm; seeds 43 and 44). Each one is
+another full training, so check the remaining GPU time first.
+
+Not verified: Colab's Python is newer than the 3.11 this project is tested on, and its
+preinstalled package versions differ. The notebook installs the four packages that matter and runs
+the code from source. If a cell fails, copy the full error text back to the Engineer.
+
 ## Kaggle Notebooks (free GPU)
 
 1. Push this repository to GitHub first (the notebook clones it), including `data/splits/`.

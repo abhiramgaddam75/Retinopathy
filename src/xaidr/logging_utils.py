@@ -31,7 +31,9 @@ def git_commit(repo_root: Path = Path(".")) -> str:
     """Current commit hash; read from .git directly so it works without git on PATH."""
     head = repo_root / ".git" / "HEAD"
     if not head.is_file():
-        return "unknown"
+        # a bundle without .git carries the commit it was built from (tools/make_colab_bundle.py)
+        stamp = repo_root / "COMMIT"
+        return stamp.read_text(encoding="utf-8").strip() if stamp.is_file() else "unknown"
     ref = head.read_text(encoding="utf-8").strip()
     if not ref.startswith("ref:"):
         return ref

@@ -41,7 +41,7 @@ eval:
   - 44
 minority:
   factor: 3
-  mode: oversample
+  mode: none
   target_grades:
   - 3
   - 4
@@ -64,7 +64,7 @@ train:
   early_stopping:
     monitor: selection_score
     patience: 8
-  epochs: 20
+  epochs: 5
   grad_accum: 2
   grad_clip_norm: 1.0
   loss:
