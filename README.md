@@ -18,6 +18,13 @@ by milestone (Section 15.1).
 
 Results in `results/` come from the CPU fallback model and are labelled as such in every file. Table 5 and the cross-dataset summary do not exist: they need IDRiD and Messidor-2. See [docs/HANDOFF.md](docs/HANDOFF.md) for the current state.
 
+## Demo web app
+
+Double-click `run_demo.bat` (or run `python -m streamlit run app/demo_app.py`) and open
+<http://localhost:8501>. Upload a fundus photograph to get DR detection, the severity grade and a
+Grad-CAM++ heat-map. It runs offline on the CPU with the trained fallback model. See
+[docs/DEMO_GUIDE.md](docs/DEMO_GUIDE.md).
+
 ## Setup
 
 Python 3.10 or 3.11 only.

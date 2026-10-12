@@ -24,6 +24,17 @@ Changes to DESIGN.md Section 5, and implementation choices the design left open.
 | 2026-10-10 | `dataset.py` | A missing label is returned as `-1`. | Messidor-2 rows may have no five-class grade (Section 8.3). |
 | 2026-10-10 | `cli.py` | `prepare-data` fails when a configured dataset folder is missing; `--datasets` selects a subset. | "If a dataset file is missing, stop and ask" (Section 0). |
 
+## Demo web app, 2026-10-12 (docs/DEMO_APP_BRIEF.md)
+
+| Item | Choice | Reason |
+|---|---|---|
+| Framework | Streamlit 1.65.0, one file `app/demo_app.py`; installed without trouble, so the `http.server` fallback (A2) was not needed. | Brief A1. |
+| Prediction | `xaidr.inference.predict_image` reuses the training preprocessing, the model and the frozen threshold. A test checks that a raw APTOS test image gives the stored test prediction (difference below 1e-5). | Brief A4-A6. |
+| Explanation | Grad-CAM++ only, on the "any DR" score. For a healthy result the map is drawn faintly and captioned as attention, because a min-max scaled map always has a peak. | Brief A7. |
+| Fundus check | Colour and dark-frame heuristic. It passed 148 of 150 APTOS test images and 9 of 10 supplied photos, and rejected noise, blank, sky-coloured and skin-coloured pictures. It warns; it does not block. | Brief A12. |
+| Samples | `tools/make_demo_samples.py`: first two test images of each grade in id order, resized to 1,200 px, stored under the git-ignored `data/demo_samples`. Six of ten are graded correctly. | Brief A10; APTOS images are not redistributed. |
+| Not done | SHAP and LIME in the app (one to two minutes per image on this CPU). Offline start was not tested by switching Wi-Fi off; the app makes no network calls by design (weights come from the checkpoint, the albumentations version check and Streamlit usage statistics are disabled). | Brief A7, A9. |
+
 ## Team decision, 2026-10-12: local only
 
 The team decided not to use Colab or another GPU. The model of record is therefore the CPU fallback (`convnext_tiny`, 256 px, `configs/cpu_fallback.yaml`), which departs from D1 and the 512 px input. Attention saliency cannot be reported for this backbone (F6), leaving three explainers. The specified model remains untrained. The 5-epoch ablation arms were also the team's choice (to save time); they are compared with each other, not with the 20-epoch run.
